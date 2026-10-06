@@ -25,8 +25,12 @@ DEFAULT_LEAD_TIME_DAYS = int(os.getenv("DEFAULT_LEAD_TIME_DAYS", "7"))
 DEFAULT_SAFETY_STOCK_FACTOR = float(os.getenv("DEFAULT_SAFETY_STOCK_FACTOR", "1.65"))
 FORECAST_HORIZON_DAYS = int(os.getenv("FORECAST_HORIZON_DAYS", "30"))
 
-# Local Data Paths
-DATA_DIR = BASE_DIR / "data"
+# Local Data Paths (Lambda environments only allow writes to /tmp)
+if os.getenv("AWS_LAMBDA_FUNCTION_NAME") or os.getenv("LAMBDA_TASK_ROOT"):
+    DATA_DIR = Path("/tmp/data")
+else:
+    DATA_DIR = BASE_DIR / "data"
+
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 SQLITE_DB_PATH = DATA_DIR / "inventory_local.db"
 REPORTS_DIR = DATA_DIR / "reports"

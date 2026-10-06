@@ -12,9 +12,20 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-# Ensure STORAGE_MODE is aws when running in AWS Lambda
-if "AWS_LAMBDA_FUNCTION_NAME" in os.environ:
-    os.environ["STORAGE_MODE"] = "aws"
+# Ensure Lambda writable data directory and initialize pre-seeded database
+if "AWS_LAMBDA_FUNCTION_NAME" in os.environ or os.getenv("LAMBDA_TASK_ROOT"):
+    import shutil
+    tmp_data = Path("/tmp/data")
+    tmp_data.mkdir(parents=True, exist_ok=True)
+    tmp_reports = Path("/tmp/data/reports")
+    tmp_reports.mkdir(parents=True, exist_ok=True)
+    tmp_db = tmp_data / "inventory_local.db"
+    bundled_db = ROOT_DIR / "backend" / "data" / "inventory_local.db"
+    if not tmp_db.exists() and bundled_db.exists():
+        try:
+            shutil.copy2(bundled_db, tmp_db)
+        except Exception:
+            pass
 
 from mangum import Mangum
 from backend.app.main import app

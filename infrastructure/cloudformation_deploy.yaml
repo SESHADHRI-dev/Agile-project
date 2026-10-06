@@ -1,0 +1,169 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  CloudFormation / SAM Template for Cloud-Based Intelligent Inventory Management
+  & Stock Prediction System (IntelliStock India)
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, prod]
+    Description: Deployment stage environment
+
+Globals:
+  Api:
+    Cors:
+      AllowMethods: "'*'"
+      AllowHeaders: "'*'"
+      AllowOrigin: "'*'"
+  Function:
+    Timeout: 30
+    MemorySize: 512
+    Runtime: python3.11
+    Environment:
+      Variables:
+        STORAGE_MODE: aws
+        DYNAMODB_TABLE_NAME: !Ref InventoryDynamoDBTable
+        S3_REPORTS_BUCKET: !Ref InventoryReportsBucket
+        COGNITO_USER_POOL_ID: !Ref CognitoUserPool
+        COGNITO_APP_CLIENT_ID: !Ref CognitoUserPoolClient
+        AWS_NODEJS_CONNECTION_REUSE_ENABLED: "1"
+
+Resources:
+  # ============================================================================
+  # 1. DynamoDB Primary Table (On-Demand / Free-Tier Friendly)
+  # ============================================================================
+  InventoryDynamoDBTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub inventory-management-table-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: GSI1_PK
+          AttributeType: S
+        - AttributeName: GSI1_SK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: GSI1
+          KeySchema:
+            - AttributeName: GSI1_PK
+              KeyType: HASH
+            - AttributeName: GSI1_SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      Tags:
+        - Key: Project
+          Value: IntelliStock-India
+
+  # ============================================================================
+  # 2. Amazon S3 Reports Bucket
+  # ============================================================================
+  InventoryReportsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub inventory-reports-mtech-${AWS::AccountId}-${Environment}
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireDemoReportsAfter30Days
+            Status: Enabled
+            ExpirationInDays: 30
+
+  # ============================================================================
+  # 3. Amazon Cognito Authentication
+  # ============================================================================
+  CognitoUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub inventory-user-pool-${Environment}
+      UsernameAttributes:
+        - email
+      AutoVerifiedAttributes:
+        - email
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireUppercase: true
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: false
+
+  CognitoUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: !Sub inventory-app-client-${Environment}
+      UserPoolId: !Ref CognitoUserPool
+      GenerateSecret: false
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+        - ALLOW_USER_SRP_AUTH
+
+  # ============================================================================
+  # 4. Amazon CloudWatch Logs (7-day retention for cost control)
+  # ============================================================================
+  ApiLambdaLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/inventory-api-backend-${Environment}
+      RetentionInDays: 7
+
+  # ============================================================================
+  # 5. AWS Lambda API Backend Function
+  # ============================================================================
+  InventoryApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub inventory-api-backend-${Environment}
+      CodeUri:
+        Bucket: !Sub intellistock-deployment-${AWS::AccountId}-${AWS::Region}
+        Key: lambda.zip
+      Handler: lambda.lambda_handler.lambda_handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref InventoryDynamoDBTable
+        - S3CrudPolicy:
+            BucketName: !Ref InventoryReportsBucket
+      Events:
+        ApiRoot:
+          Type: Api
+          Properties:
+            Path: /
+            Method: ANY
+        ApiProxy:
+          Type: Api
+          Properties:
+            Path: /{proxy+}
+            Method: ANY
+
+Outputs:
+  ApiUrl:
+    Description: Production API Gateway Endpoint URL
+    Value: !Sub https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod
+  DynamoDBTableName:
+    Description: DynamoDB Table Name
+    Value: !Ref InventoryDynamoDBTable
+  ReportsBucketName:
+    Description: S3 Storage Bucket for Reports
+    Value: !Ref InventoryReportsBucket
+  CognitoUserPoolId:
+    Description: Cognito User Pool ID
+    Value: !Ref CognitoUserPool
+  CognitoClientId:
+    Description: Cognito App Client ID
+    Value: !Ref CognitoUserPoolClient
