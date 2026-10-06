@@ -118,7 +118,7 @@ export default function Navbar({
             fontSize: '0.7rem',
             color: 'var(--text-muted)',
             fontFamily: 'var(--font-mono)'
-          }} title="Last successful synchronization with local SQLite & in-memory state in Indian Standard Time">
+          }} title="Last successful synchronization with authoritative backend database in Indian Standard Time">
             <Clock size={12} />
             <span>{lastSyncTime}</span>
           </div>

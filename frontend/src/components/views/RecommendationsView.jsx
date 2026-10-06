@@ -111,7 +111,7 @@ export default function RecommendationsView({ onNavigate }) {
                   <td style={{ textAlign: 'right' }}>
                     {rec.recommended_restock > 0 ? (
                       <button
-                        onClick={() => onNavigate('purchases')}
+                        onClick={() => onNavigate('purchases', { product_id: rec.product_id, quantity: rec.recommended_restock })}
                         className="btn btn-primary btn-sm"
                       >
                         <ShoppingBag size={13} />

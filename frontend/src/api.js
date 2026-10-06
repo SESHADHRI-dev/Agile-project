@@ -16,25 +16,40 @@ const API_BASE = (typeof import.meta !== 'undefined' && (import.meta.env?.VITE_A
 
 class ApiService {
   constructor() {
-    // If no token in localStorage, initialize with local development token so requests never lack Bearer header
+    // Determine token: on localhost/local dev, fallback to dev-admin-token
+    // In production (AWS), only use genuine tokens saved from login
     const saved = typeof localStorage !== 'undefined' ? localStorage.getItem("token") : null;
-    if (!saved || saved === "undefined" || saved === "null") {
-      this.token = "dev-admin-token";
-      if (typeof localStorage !== 'undefined') localStorage.setItem("token", "dev-admin-token");
+    if (isLocalHost) {
+      if (!saved || saved === "undefined" || saved === "null") {
+        this.token = "dev-admin-token";
+        if (typeof localStorage !== 'undefined') localStorage.setItem("token", "dev-admin-token");
+      } else {
+        this.token = saved;
+      }
     } else {
-      this.token = saved;
+      // In production, ignore any stale dev-admin-token
+      if (saved && saved !== "dev-admin-token" && saved !== "undefined" && saved !== "null") {
+        this.token = saved;
+      } else {
+        this.token = null;
+        if (typeof localStorage !== 'undefined') localStorage.removeItem("token");
+      }
     }
   }
 
   setToken(token) {
     this.token = token;
     if (typeof localStorage !== 'undefined') {
-      if (token) {
+      if (token && (isLocalHost || token !== "dev-admin-token")) {
         localStorage.setItem("token", token);
       } else {
-        // In local mode, keep a valid dev fallback
-        this.token = "dev-admin-token";
-        localStorage.setItem("token", "dev-admin-token");
+        localStorage.removeItem("token");
+        if (isLocalHost) {
+          this.token = "dev-admin-token";
+          localStorage.setItem("token", "dev-admin-token");
+        } else {
+          this.token = null;
+        }
       }
     }
   }
@@ -42,7 +57,9 @@ class ApiService {
   getHeaders() {
     return {
       "Content-Type": "application/json",
-      ...(this.token ? { Authorization: `Bearer ${this.token}` } : { Authorization: "Bearer dev-admin-token" })
+      ...(this.token
+        ? { Authorization: `Bearer ${this.token}` }
+        : (isLocalHost ? { Authorization: "Bearer dev-admin-token" } : {}))
     };
   }
 
@@ -56,12 +73,18 @@ class ApiService {
     try {
       const response = await fetch(url, { ...options, headers, cache: 'no-store' });
       
-      // Automatic 401 Self-Healing for Local Development
+      // Automatic 401 Self-Healing for Local Development ONLY
       if (response.status === 401 && !isRetry) {
-        console.warn(`[API] 401 Unauthorized encountered on ${endpoint}. Refreshing local development token...`);
-        this.setToken("dev-admin-token");
-        // Retry once with clean dev token
-        return this.request(endpoint, options, true);
+        if (isLocalHost) {
+          console.warn(`[API] 401 Unauthorized encountered on ${endpoint}. Refreshing local development token...`);
+          this.setToken("dev-admin-token");
+          // Retry once with clean dev token
+          return this.request(endpoint, options, true);
+        } else {
+          console.warn(`[API] 401 Unauthorized encountered in production on ${endpoint}. Clearing expired session...`);
+          this.setToken(null);
+          if (typeof localStorage !== 'undefined') localStorage.removeItem("user");
+        }
       }
 
       const data = await response.json().catch(() => null);
@@ -119,8 +142,11 @@ class ApiService {
   }
 
   logout() {
-    this.setToken("dev-admin-token");
-    localStorage.removeItem("user");
+    this.setToken(null);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem("user");
+      localStorage.removeItem("token");
+    }
   }
 
   // Products

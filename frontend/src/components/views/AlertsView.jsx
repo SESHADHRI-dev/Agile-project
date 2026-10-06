@@ -21,7 +21,7 @@ export default function AlertsView({ alerts = [], onNavigate, onRefresh, isSynci
             disabled={isSyncing}
             className="btn btn-secondary btn-sm"
             style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-            title="Fetch latest stock balances and recalculate active alerts from SQLite backend"
+            title="Fetch latest stock balances and recalculate active alerts from backend"
           >
             <RefreshCw size={14} className={isSyncing ? "spin-animation" : ""} />
             <span>{isSyncing ? 'Syncing...' : 'Sync Alerts'}</span>

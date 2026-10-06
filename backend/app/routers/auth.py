@@ -104,15 +104,27 @@ def login(payload: LoginRequest):
         id_token = auth_res.get("IdToken")
         access_token = auth_res.get("AccessToken")
 
+        claims = {}
+        if id_token:
+            import base64
+            parts = id_token.split('.')
+            if len(parts) == 3:
+                padding = '=' * (4 - (len(parts[1]) % 4))
+                claims = json.loads(base64.urlsafe_b64decode(parts[1] + padding).decode('utf-8'))
+
+        groups = claims.get("cognito:groups", [])
+        role = "Admin" if "Admin" in groups or "admin" in groups else "Staff"
+        name = claims.get("name") or ("Dr. S. Sharma" if role == "Admin" else "Seshadhri")
+
         return {
             "success": True,
             "token": id_token or access_token,
             "auth_mode": "aws_cognito",
             "user": {
-                "id": username,
-                "username": username,
-                "role": "Admin",  # Extracted from Cognito claims
-                "name": username
+                "id": claims.get("sub", username),
+                "username": claims.get("email", username),
+                "role": role,
+                "name": name
             }
         }
     except Exception as e:

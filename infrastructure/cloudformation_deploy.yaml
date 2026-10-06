@@ -23,6 +23,7 @@ Globals:
     Runtime: python3.11
     Environment:
       Variables:
+        AUTH_MODE: aws
         STORAGE_MODE: aws
         DYNAMODB_TABLE_NAME: !Ref InventoryDynamoDBTable
         S3_REPORTS_BUCKET: !Ref InventoryReportsBucket

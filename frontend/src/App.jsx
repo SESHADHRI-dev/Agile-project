@@ -133,7 +133,7 @@ export default function App() {
       setLastSyncTime(istTime);
       setSyncToast({
         type: 'success',
-        message: `Local SQLite & In-Memory State Synchronized at ${istTime}`
+        message: `${authConfig?.storage_mode === 'aws' ? 'Amazon DynamoDB' : 'Local SQLite'} State Synchronized at ${istTime}`
       });
       setTimeout(() => setSyncToast({ type: '', message: '' }), 4000);
     } catch (err) {

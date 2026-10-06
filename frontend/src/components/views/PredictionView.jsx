@@ -339,7 +339,7 @@ export default function PredictionView({ products = [], onNavigate }) {
               <div style={{ marginTop: '1.25rem', display: 'flex', justifyContent: 'flex-end' }}>
                 <button
                   id="btn-order-replenishment-from-prediction"
-                  onClick={() => onNavigate('purchases')}
+                  onClick={() => onNavigate('purchases', { product_id: selectedProductId, quantity: result.recommended_restock })}
                   className="btn btn-primary"
                 >
                   <ShoppingBag size={16} />

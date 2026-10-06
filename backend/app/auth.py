@@ -159,11 +159,13 @@ def verify_cognito_token(token: str) -> Dict[str, Any]:
         role = "Admin" if "Admin" in groups or "admin" in groups else "Staff"
         username = payload.get("email") or payload.get("cognito:username") or payload.get("username", "")
 
+        name = payload.get("name") or ("Dr. S. Sharma" if role == "Admin" else "Seshadhri")
+
         return {
             "id": payload.get("sub", username),
             "username": username,
             "role": role,
-            "name": payload.get("name", username)
+            "name": name
         }
     except HTTPException:
         raise
