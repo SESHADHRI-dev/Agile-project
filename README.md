@@ -1,200 +1,281 @@
-# Cloud-Based Intelligent Inventory Management & Stock Prediction System
+# IntelliStock India — Cloud-Based Intelligent Inventory Management & Stock Prediction System
 
-**Academic Project:** Integrated M.Tech in Software Engineering  
-**Specialization:** Software Configuration Management, Cloud Computing & ML Engineering  
-**Architecture:** Serverless AWS (Amplify, Cognito, API Gateway, Lambda, DynamoDB, S3, CloudWatch) & Local Zero-Cost Dev Mode  
+[![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688.svg?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![React](https://img.shields.io/badge/Frontend-React_18-61DAFB.svg?logo=react&logoColor=black)](https://react.dev)
+[![Vite](https://img.shields.io/badge/Bundler-Vite_8-646CFF.svg?logo=vite&logoColor=white)](https://vitejs.dev)
+[![Python](https://img.shields.io/badge/Python-3.14+-3776AB.svg?logo=python&logoColor=white)](https://www.python.org)
+[![Tests](https://img.shields.io/badge/Pytest-86_Passed-brightgreen.svg?logo=pytest&logoColor=white)](https://pytest.org)
+[![AWS Ready](https://img.shields.io/badge/AWS-Serverless_SAM-FF9900.svg?logo=amazonaws&logoColor=white)](https://aws.amazon.com)
+[![Localization](https://img.shields.io/badge/Locale-India_(₹_INR_|_GST)-orange.svg)](https://en.wikipedia.org/wiki/Goods_and_Services_Tax_(India))
 
----
+**IntelliStock India** is an enterprise-grade, cloud-native inventory management and intelligent replenishment system tailored for Indian manufacturing and distribution enterprises (headquartered in Katpadi, Vellore, Tamil Nadu).
 
-## 1. Project Overview
-
-This project is an enterprise-ready, serverless, cloud-native inventory management and intelligent replenishment system. Designed to bridge transactional record-keeping with proactive decision support, the system automates:
-1. **Catalog & Vendor Management:** Centralized product records and supplier relationships.
-2. **Transactional Integrity:** Real-time stock recalculation following strict domain invariants:
-   $$\text{Current Stock} = \text{Previous Stock} + \text{Purchases} - \text{Sales}$$
-3. **Over-Sale Guardrails:** Strictly prevents selling items beyond verified warehouse inventory.
-4. **Automated Stockout Alerts:** Flags out-of-stock items and warns when $\text{Current Stock} \le \text{Minimum Stock Level}$.
-5. **Intelligent Demand Forecasting (ML):** Analyzes historical sales time-series using statistical methods (**Single Exponential Smoothing**, **Weighted Moving Average**, **Simple Moving Average**).
-6. **Optimized Restocking Recommendations:**
-   $$\text{Recommended Restock} = \max(0, \text{Predicted Demand} + \text{Safety Stock} - \text{Current Stock})$$
-7. **Audit Reporting & Data Exports:** Tabular exports (CSV/PDF) and optional Amazon S3 archival.
-8. **Role-Based Access Control (RBAC):** Admin and Operations Staff profiles managed through Amazon Cognito or local authentication.
+It combines transactional record-keeping with proactive machine learning decision support, statutory GST calculations, over-sale guardrails, multi-format audit reporting (Excel, PDF, CSV), and dual-mode runtime deployment (zero-cost local development or production AWS Serverless).
 
 ---
 
-## 2. Technology Stack & AWS Cloud Services
+## 1. Features & Capabilities
 
+- **Catalog & Vendor Management:** Centralized product records with HSN codes, Indian GST tax slabs (5%, 12%, 18%, 28%), supplier profiles with validated state GSTINs, soft-deletion safety, and active status tracking.
+- **Strict Transactional Integrity & Invariants:** Real-time stock recomputation enforcing fundamental warehouse domain math:
+  $$\text{Current Stock} = \text{Previous Stock} + \text{Inbound Purchases} - \text{Outbound Sales}$$
+- **Zero-Negative Stock Guardrails:** Strict server-side and UI-level prevention of over-selling beyond verified physical warehouse stock.
+- **Automated Stockout & Reorder Alerts:** Instant warning when $\text{Current Stock} \le \text{Minimum Stock Level}$, and critical escalation when stock reaches 0 units.
+- **Machine Learning Demand Forecasting:** Real-time time-series demand velocity prediction utilizing:
+  - **Single Exponential Smoothing (SES)** ($\alpha = 0.3$)
+  - **Weighted Moving Average (WMA)** with recency bias
+  - **Simple Moving Average (SMA)** (14-day rolling window)
+- **Scientific Restocking Optimization:**
+  $$\text{Safety Stock} = Z \times \sigma_d \times \sqrt{L} \quad (Z = 1.65 \text{ for 95\% service level})$$
+  $$\text{Recommended Restock} = \max\left(0, \lceil \text{Predicted Demand} + \text{Safety Stock} - \text{Current Stock} \rceil\right)$$
+- **Indian Enterprise Localization:**
+  - Native Indian Rupee (`₹` INR) currency display with Indian numbering formatting (Lakhs and Crores: `₹1,50,000`).
+  - Automatic tax partitioning between intra-state transactions (CGST 9% + SGST 9%) and inter-state supplies (IGST 18%).
+  - Asia/Kolkata (IST) timestamps and date formatting.
+- **Multi-Format Export Engine:** Downloadable high-fidelity Excel workbooks (`.xlsx` via `openpyxl`), presentation-ready PDFs (`.pdf` via `reportlab`), and UTF-8 CSV reports for Inventory, Low Stock, Sales, Purchases, and Demand Forecasts.
+- **Role-Based Access Control (RBAC):**
+  - **Administrator:** Full catalog creation, editing, deletion, replenishment reorders, and settings configuration.
+  - **Operations Staff (Seshadhri):** Day-to-day transaction recording (sales and purchases) with restricted administrative rights.
+- **Dual-Mode Architecture:** Zero-dependency local developer mode (SQLite mirror with DynamoDB compatibility) and AWS Cloud production mode (DynamoDB, S3, Cognito, API Gateway, Lambda).
+
+---
+
+## 2. Technology Stack
+
+| Layer | Technologies & Tools |
+| :--- | :--- |
+| **Frontend UI** | React 18, Vite 8, Modern CSS Design Tokens, Lucide React Iconography |
+| **Backend API** | Python 3.14+, FastAPI 0.115+, Uvicorn, Pydantic v2, Mangum ASGI |
+| **ML Engine** | Pure-Python numerical statistics (SES, WMA, SMA, Lead-Time Safety Buffers) |
+| **Reporting** | OpenPyXL (Excel `.xlsx`), ReportLab (Vector PDF), Python CSV |
+| **Databases** | Dual-Mode: Amazon DynamoDB (Single-table design) / SQLite (Local relational mirror) |
+| **Cloud Services** | AWS SAM, Amazon API Gateway, AWS Lambda, Amazon Cognito, Amazon S3 |
+| **Testing** | Pytest 9.1.1 (86 test cases), Puppeteer-Core E2E Browser Testing |
+
+---
+
+## 3. Architecture Overview
+
+```text
+┌────────────────────────────────────────────────────────────────────────┐
+│                        React 18 Dashboard (Vite)                       │
+│        (Indianized UI, Dark/Light Mode, Dual RBAC Profiles, IST)       │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │ HTTPS / REST
+                                    v
+┌────────────────────────────────────────────────────────────────────────┐
+│                        FastAPI REST API Gateway                        │
+│                (Auth Layer, Domain Engine, Pydantic v2)                │
+└───────────────┬───────────────────┬───────────────────┬────────────────┘
+                │                   │                   │
+                v                   v                   v
+┌────────────────────────┐ ┌────────────────┐ ┌──────────────────────────┐
+│  Demand Forecaster     │ │ Export Engine  │ │ Storage Abstraction      │
+│  - SES (α=0.3)         │ │ - OpenPyXL     │ │ - AWS DynamoDB (Cloud)   │
+│  - Weighted MA         │ │ - ReportLab    │ │ - SQLite Mirror (Local)  │
+│  - Simple MA           │ │ - UTF-8 CSV    │ │ - Amazon S3 (Archival)   │
+└────────────────────────┘ └────────────────┘ └──────────────────────────┘
 ```
-[React 18 Dashboard] (AWS Amplify Hosting)
-        |
-   [HTTPS Auth] ----> [Amazon Cognito User Pool]
-        |
-  [REST API Calls]
-        v
-[Amazon API Gateway]
-        v
-[AWS Lambda (Python 3.14)] <---> [Amazon CloudWatch Logs]
-        |
-        +---> [Amazon DynamoDB (Inventory & Transactions Table)]
-        +---> [Amazon S3 (CSV & PDF Reports)]
-        +---> [Forecasting Engine (SMA, WMA, Exponential Smoothing)]
-```
-
-- **Frontend:** React 18, Vite, Custom CSS Design System, Lucide Icons.
-- **Backend API:** Python 3.14, FastAPI, Uvicorn, Pydantic, Mangum.
-- **Database:** Dual-mode storage — Amazon DynamoDB (AWS mode) / SQLite with 1:1 DynamoDB schema mapping (Local mode).
-- **Security:** Amazon Cognito JWT verification, IAM least-privilege policies, CORS guards.
-- **Testing:** Pytest 9.1.1 (22 automated unit, integration, and algorithmic test cases).
 
 ---
 
-## 3. Repository Structure
+## 4. Repository Structure
 
 ```text
 .
-├── backend/                  # FastAPI REST API Backend
+├── backend/                       # FastAPI REST API Backend
 │   ├── app/
-│   │   ├── auth.py           # JWT & Cognito authentication layer
-│   │   ├── config.py         # App configuration & environment settings
-│   │   ├── database.py       # Dual-mode DB engine (SQLite / DynamoDB)
-│   │   ├── domain.py         # Inventory domain math & validation rules
-│   │   ├── main.py           # FastAPI application entrypoint
-│   │   ├── models.py         # Pydantic schemas
-│   │   └── routers/          # API route controllers
-│   │       ├── auth.py
-│   │       ├── products.py
-│   │       ├── suppliers.py
-│   │       ├── purchases.py
-│   │       ├── sales.py
-│   │       ├── inventory.py
-│   │       ├── predictions.py
-│   │       ├── reports.py
-│   │       └── seed.py
-│   └── data/                 # Local SQLite database & generated reports
-├── ml/                       # Demand Forecasting Engine
-│   └── forecaster.py         # SMA, WMA, Exponential Smoothing & Safety Stock
-├── frontend/                 # Modern React Dashboard (Vite)
+│   │   ├── auth.py                # Dual-mode authentication (Cognito & Local JWT)
+│   │   ├── config.py              # Environment configuration & defaults
+│   │   ├── database.py            # Dual-mode DB abstraction (SQLite / DynamoDB)
+│   │   ├── domain.py              # Inventory domain invariants & validation rules
+│   │   ├── main.py                # FastAPI application entrypoint & middleware
+│   │   ├── models.py              # Pydantic v2 schemas & request/response models
+│   │   └── routers/               # API route controllers
+│   │       ├── auth.py            # Login, token validation, user profile
+│   │       ├── products.py        # Product catalog CRUD & soft delete
+│   │       ├── suppliers.py       # Vendor management & GSTIN tracking
+│   │       ├── purchases.py       # Inbound stock transactions
+│   │       ├── sales.py           # Outbound sales & over-sale rejection
+│   │       ├── inventory.py       # Stock ledger & discrepancy detection
+│   │       ├── predictions.py     # Demand forecast generation & restock orders
+│   │       ├── reports.py         # Multi-format exports (CSV, PDF, Excel)
+│   │       └── seed.py            # Initial Indian seed dataset
+├── ml/                            # Machine Learning Demand Forecasting Engine
+│   └── forecaster.py              # SES, WMA, SMA & Safety Stock formulas
+├── frontend/                      # Modern React 18 Single-Page Application
 │   ├── src/
-│   │   ├── api.js            # Frontend REST client
-│   │   ├── index.css         # Modern dark/light design system
-│   │   ├── App.jsx           # Master layout & state coordinator
+│   │   ├── App.jsx                # Layout coordinator & view router
+│   │   ├── api.js                 # Axios/Fetch API client with JWT handling
+│   │   ├── index.css              # Glassmorphic CSS design system
 │   │   └── components/
-│   │       ├── Sidebar.jsx
-│   │       ├── Navbar.jsx
-│   │       ├── LoginModal.jsx
-│   │       └── views/        # Dashboard, Inventory, Products, Sales, etc.
-│   └── package.json
-├── lambda/                   # Standalone AWS Lambda Deployment Handlers
-│   └── lambda_handler.py     # Mangum ASGI adapter for API Gateway
-├── infrastructure/           # CloudFormation / AWS SAM Template
-│   └── template.yaml         # DynamoDB, Cognito, S3, Lambda, API Gateway
-├── tests/                    # Automated Test Suite (Pytest)
-│   ├── test_inventory_math.py
-│   ├── test_prediction.py
-│   └── test_api_endpoints.py
-├── docs/                     # Academic Documentation
-├── PROJECT_PLAN.md           # Engineering specifications & requirements
-├── ARCHITECTURE.md           # Cloud architecture & data flows
-├── DATABASE_DESIGN.md        # DynamoDB single-table schema & query patterns
-├── API_DOCUMENTATION.md      # REST endpoints & payload formats
-├── TESTING.md                # 22 test cases and test strategy
-├── DEPLOYMENT.md             # AWS Amplify, Lambda, Cognito deployment guide
-├── COST_AND_FREE_TIER.md     # Free Tier protection & cost avoidance guide
-├── SPRINT_PLAN.md            # Agile Scrum sprint breakdown
-├── .env.example              # Template environment configuration
-└── .gitignore
+│   │       ├── Navbar.jsx         # Header bar, sync indicator, theme switch
+│   │       ├── Sidebar.jsx        # Navigation links & active user profile
+│   │       ├── LoginModal.jsx     # Fast authentication & demo role switcher
+│   │       └── views/             # Views: Dashboard, Products, Sales, etc.
+│   ├── run_browser_e2e.js         # End-to-end browser automation suite
+│   ├── package.json               # Node dependencies & build scripts
+│   └── vite.config.js             # Vite configuration
+├── lambda/                        # AWS Lambda Deployment Handler
+│   └── lambda_handler.py          # Mangum ASGI adapter for API Gateway
+├── infrastructure/                # AWS SAM Infrastructure as Code
+│   └── template.yaml              # CloudFormation Serverless template
+├── tests/                         # Comprehensive Automated Test Suite
+│   ├── test_api_endpoints.py      # Core REST API endpoint tests
+│   ├── test_audit_fixes.py        # System audit & fix verification
+│   ├── test_forecast_comprehensive.py # Mathematical ML forecasting tests
+│   ├── test_full_system_verification.py # Full lifecycle integration tests
+│   ├── test_inventory_math.py     # Inventory invariant & over-sale tests
+│   ├── test_low_stock_alerts_sync.py # Alert thresholds & sync tests
+│   ├── test_prediction.py         # Restock order pipeline tests
+│   └── test_ui_forecasting_acceptance.js # Puppeteer UI acceptance test
+├── .env.example                   # Environment configuration template
+├── .gitignore                     # Production Git exclusion rules
+├── requirements.txt               # Python package dependencies
+├── API_DOCUMENTATION.md           # Exhaustive REST API specification
+├── ARCHITECTURE.md                # System design & cloud data flow
+├── DATABASE_DESIGN.md             # DynamoDB single-table schema documentation
+├── DEPLOYMENT.md                  # AWS production deployment guide
+├── COST_AND_FREE_TIER.md          # AWS Free Tier cost control guide
+└── FINAL_TESTING_AND_VERIFICATION_REPORT.md # Audit verification report
 ```
 
 ---
 
-## 4. How to Run Locally (Zero Cost)
+## 5. Getting Started & Installation
 
-### Step 1: Start Backend API
-Open a terminal in the project root:
+### Prerequisites
+- **Python:** 3.11+ (Python 3.14 supported)
+- **Node.js:** v18+ (Node v22+ recommended)
+- **Git**
+
+### Step 1: Clone the Repository
 ```bash
-python -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000 --reload
+git clone https://github.com/SESHADHRI-dev/Agile-project.git
+cd Agile-project
 ```
-*The API is now live at `http://127.0.0.1:8000`. Interactive Swagger docs are accessible at `http://127.0.0.1:8000/docs`.*
 
-### Step 2: Start React Frontend
-Open a second terminal:
+### Step 2: Environment Setup
+Copy the provided environment template to `.env`:
+```bash
+cp .env.example .env
+```
+*(On Windows PowerShell: `Copy-Item .env.example .env`)*
+
+By default, the application runs in zero-cost local mode (`STORAGE_MODE=local`, `AUTH_MODE=local`) without requiring any AWS account or cloud credentials.
+
+### Step 3: Install Backend Dependencies
+Set up a Python virtual environment and install the required packages:
+```bash
+python -m venv venv
+
+# On Windows:
+venv\Scripts\activate
+
+# On Linux / macOS:
+source venv/bin/activate
+
+pip install -r requirements.txt
+```
+
+### Step 4: Install Frontend Dependencies
 ```bash
 cd frontend
 npm install
+cd ..
+```
+
+---
+
+## 6. Running Locally
+
+### Start Backend API Server
+In your project root (with virtual environment activated):
+```bash
+python -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000 --reload
+```
+- API Endpoint: `http://127.0.0.1:8000`
+- Interactive Swagger Documentation: `http://127.0.0.1:8000/docs`
+- Health Check: `http://127.0.0.1:8000/api/health`
+
+### Start React Frontend
+In a new terminal:
+```bash
+cd frontend
 npm run dev
 ```
-*The React Dashboard is now accessible at `http://localhost:5173`.*
+- Frontend Dashboard: `http://localhost:5173`
 
-### Step 3: Default Demo Credentials
-- **Administrator:** `admin@inventory.io` | `Password123!`
-- **Operations Staff:** `staff@inventory.io` | `Password123!`
-*(One-click demo buttons are provided on the login screen).*
-
----
-
-## 5. Automated Test Suite
-
-Execute all 22 automated test cases covering domain math, algorithm accuracy, and API endpoints:
+### Production Frontend Build
+To verify or compile the production web application assets:
 ```bash
-pytest tests/ -v
-```
-
-Output:
-```text
-tests/test_api_endpoints.py::test_health_endpoint PASSED
-tests/test_api_endpoints.py::test_auth_login_success PASSED
-tests/test_api_endpoints.py::test_products_list_and_search PASSED
-tests/test_api_endpoints.py::test_purchase_and_stock_increase PASSED
-tests/test_api_endpoints.py::test_sale_and_stock_decrease PASSED
-tests/test_api_endpoints.py::test_oversale_rejection PASSED
-tests/test_api_endpoints.py::test_alerts_endpoint PASSED
-tests/test_api_endpoints.py::test_prediction_calculation_endpoint PASSED
-tests/test_api_endpoints.py::test_report_export_csv PASSED
-tests/test_inventory_math.py::test_mandatory_purchase_case PASSED
-tests/test_inventory_math.py::test_mandatory_sale_case PASSED
-tests/test_inventory_math.py::test_mandatory_low_stock_case PASSED
-tests/test_inventory_math.py::test_mandatory_out_of_stock_case PASSED
-tests/test_inventory_math.py::test_mandatory_in_stock_case PASSED
-tests/test_inventory_math.py::test_mandatory_over_sale_rejection PASSED
-tests/test_prediction.py::test_simple_moving_average PASSED
-tests/test_prediction.py::test_weighted_moving_average PASSED
-tests/test_prediction.py::test_exponential_smoothing PASSED
-tests/test_prediction.py::test_restock_formula_from_specification PASSED
-tests/test_prediction.py::test_generate_recommendation_pipeline PASSED
-===================== 22 passed in 1.14s =====================
+cd frontend
+npm run build
 ```
 
 ---
 
-## 6. Faculty Demonstration Procedure (10-Minute Walkthrough)
+## 7. Default Demo Accounts & Login
 
-1. **System Health & Architecture:**
-   - Open `http://127.0.0.1:8000/api/health` in browser to show API status.
-   - Explain serverless architecture: React $\rightarrow$ Cognito $\rightarrow$ API Gateway $\rightarrow$ Lambda $\rightarrow$ DynamoDB $\rightarrow$ S3.
-2. **Login & RBAC:**
-   - Log in as **Administrator** using one-click login. Point out role indicator in sidebar.
-3. **Executive Dashboard:**
-   - Review KPI metric cards (Total Products, Physical Stock, Inventory Value, Low-Stock items, Out-of-Stock items).
-4. **Mandatory Invariant Test: Inbound Purchase:**
-   - Navigate to **Purchases** $\rightarrow$ Click **Record New Purchase**.
-   - Select `Industrial IoT Gateway Hub` (Stock: 14) $\rightarrow$ Purchase 25 units.
-   - Show live formula preview: $14 + 25 = 39$ units.
-   - Submit and verify stock balance immediately increases to 39 in the catalog.
-5. **Mandatory Invariant Test: Outbound Sale & Guardrail:**
-   - Navigate to **Sales** $\rightarrow$ Click **Record Customer Sale**.
-   - Attempt to sell 999 units of a product $\rightarrow$ Show the **Insufficient Stock Guardrail** red warning and disabled button.
-   - Record a valid sale of 5 units $\rightarrow$ Submit and verify stock decreases.
-6. **Low-Stock Alerting:**
-   - Navigate to **Alerts**. Show critical alert for `Ultra-High Pressure Hydraulic Valve` (0 stock) and warning alerts for items $\le$ minimum stock.
-7. **Intelligent Demand Prediction:**
-   - Navigate to **Demand Forecasting**.
-   - Select a product with sales history and choose **Single Exponential Smoothing (SES)**.
-   - Click **Run Demand Forecast**.
-   - Explain the result cards: Daily Demand Rate, Projected Demand, Safety Stock Buffer, and Recommended Restock quantity.
-   - Show the step-by-step formula breakdown.
-8. **Restocking Reorder Sheet:**
-   - Navigate to **Restock Orders**. Show the prioritized replenishment list sorted by urgency.
-9. **Audit Reports:**
-   - Navigate to **Audit Reports** $\rightarrow$ Click **Download CSV Export** for Inventory Valuation. Open CSV file to verify structure.
-10. **Cloud Cost Control:**
-    - Open [COST_AND_FREE_TIER.md](file:///d:/1-fall%2026-27/software%20configuration%20management/scm%20test%20tasks/COST_AND_FREE_TIER.md) and highlight how the architecture stays 100% within the AWS Free Tier.
+The application includes pre-configured local development identities for friction-free evaluation:
+
+| Identity | Email / Username | Password | Role | Privileges |
+| :--- | :--- | :--- | :--- | :--- |
+| **Dr. S. Sharma** | `admin@intellistock.in` | `Password123!` | `Admin` | Full Administrative & Catalog Control |
+| **Seshadhri** | `staff@intellistock.in` | `Password123!` | `Staff` | Day-to-day Sales & Purchase Transactions |
+
+*Note: One-click fast login buttons for both Administrator and Operations Staff are integrated directly into the login modal.*
+
+---
+
+## 8. Automated Testing
+
+### Backend Unit & Integration Tests (86 Tests)
+Run the complete backend test suite using Pytest:
+```bash
+python -m pytest tests/ -v
+```
+
+All 86 test cases validate:
+- System health and API authentication
+- Product catalog CRUD and soft deletion
+- Inventory calculation invariants ($S_t = S_{t-1} + P_t - S_t$)
+- Negative stock rejection & over-sale guards
+- Low-stock and out-of-stock alert threshold accuracy
+- Time-series demand forecasting (SES, WMA, SMA) and restock recommendation math
+- Multi-format report export generation (CSV, PDF, Excel)
+- Full lifecycle business workflows
+
+### Frontend Browser End-to-End Tests
+Ensure both backend (`port 8000`) and frontend (`port 5173`) servers are running, then execute:
+```bash
+node frontend/run_browser_e2e.js
+```
+
+---
+
+## 9. AWS Cloud Deployment (Production)
+
+To deploy to Amazon Web Services using AWS SAM:
+
+```bash
+# Build the SAM application
+sam build --template infrastructure/template.yaml
+
+# Guided deployment to AWS ap-south-1 (Mumbai)
+sam deploy --guided
+```
+
+This provisions:
+- **Amazon DynamoDB:** Pay-Per-Request single-table inventory database.
+- **Amazon Cognito:** User pool and client for secure cloud authentication.
+- **AWS Lambda & API Gateway:** Serverless Python backend with Mangum ASGI adapter.
+- **Amazon S3:** Private bucket for cloud report archival.
+
+Refer to [DEPLOYMENT.md](file:///d:/1-fall%2026-27/software%20configuration%20management/scm%20test%20tasks/DEPLOYMENT.md) and [COST_AND_FREE_TIER.md](file:///d:/1-fall%2026-27/software%20configuration%20management/scm%20test%20tasks/COST_AND_FREE_TIER.md) for full deployment instructions.
+
+---
+
+## 10. License
+
+This project was developed for the Integrated M.Tech in Software Engineering curriculum as an enterprise software configuration management and cloud-native computing capstone.

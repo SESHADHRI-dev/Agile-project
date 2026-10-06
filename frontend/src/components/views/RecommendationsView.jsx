@@ -39,6 +39,7 @@ export default function RecommendationsView({ onNavigate }) {
 
         <div style={{ display: 'flex', gap: '0.75rem' }}>
           <select
+            id="recom-method-select"
             className="form-select"
             style={{ width: 'auto' }}
             value={method}
@@ -49,7 +50,7 @@ export default function RecommendationsView({ onNavigate }) {
             <option value="moving_average">Simple Moving Average (SMA)</option>
           </select>
 
-          <button onClick={fetchRecommendations} disabled={loading} className="btn btn-secondary">
+          <button id="btn-recalc-recom" onClick={fetchRecommendations} disabled={loading} className="btn btn-secondary">
             <RefreshCw size={15} />
             <span>{loading ? 'Calculating...' : 'Recalculate'}</span>
           </button>

@@ -174,11 +174,16 @@ class SaleResponse(BaseModel):
 # ==============================================================================
 
 class PredictionRequest(BaseModel):
-    product_id: str
-    method: Optional[str] = "exponential_smoothing"  # "moving_average", "weighted_moving_average", "exponential_smoothing"
-    forecast_days: Optional[int] = 30
-    lead_time_days: Optional[int] = 7
-    safety_stock_factor: Optional[float] = 1.65
+    product_id: str = Field(..., min_length=1, description="Target Product SKU identifier")
+    method: Optional[str] = Field("exponential_smoothing", description="Forecasting algorithm (SES, WMA, SMA)")
+    forecast_days: Optional[int] = Field(None, ge=1, le=180, description="Forecast horizon in days")
+    horizon_days: Optional[int] = Field(None, ge=1, le=180, description="Forecast horizon alias in days")
+    lead_time_days: Optional[int] = Field(7, ge=1, le=90, description="Supplier lead time in days")
+    safety_stock_factor: Optional[float] = Field(1.65, ge=0.0, le=5.0, description="Safety stock quantile multiplier")
+
+    @property
+    def effective_horizon_days(self) -> int:
+        return self.forecast_days or self.horizon_days or 30
 
 class PredictionResponse(BaseModel):
     product_id: str

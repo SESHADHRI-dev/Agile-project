@@ -31,7 +31,7 @@ def calculate_product_prediction(
         sales_records=sales,
         current_stock=prod["quantity"],
         method=payload.method or "exponential_smoothing",
-        forecast_horizon_days=payload.forecast_days or 30,
+        forecast_horizon_days=payload.effective_horizon_days,
         lead_time_days=payload.lead_time_days or 7,
         safety_stock_factor=payload.safety_stock_factor or 1.65
     )

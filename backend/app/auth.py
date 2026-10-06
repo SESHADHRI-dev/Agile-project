@@ -34,7 +34,7 @@ LOCAL_USERS = {
         "username": "staff@intellistock.in",
         "password": "Password123!",
         "role": "Staff",
-        "name": "Arun Kumar (Operations Staff)"
+        "name": "Seshadhri (Operations Staff)"
     },
     # Backwards compatibility aliases
     "admin@inventory.io": {
@@ -49,7 +49,7 @@ LOCAL_USERS = {
         "username": "staff@intellistock.in",
         "password": "Password123!",
         "role": "Staff",
-        "name": "Arun Kumar (Operations Staff)"
+        "name": "Seshadhri (Operations Staff)"
     }
 }
 

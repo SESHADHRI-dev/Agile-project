@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Search, Edit, Trash2, X, Phone, Mail, MapPin, AlertCircle, Building2, CheckCircle2 } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, X, Phone, Mail, MapPin, AlertCircle, Building2, CheckCircle2, ShieldAlert } from 'lucide-react';
 import { api } from '../../api';
 import { INDIAN_STATES, formatIndianPhone, isValidIndianPhone } from '../../utils/formatters';
 
@@ -9,6 +9,11 @@ export default function SuppliersView({ suppliers = [], onRefresh, user }) {
   const [editingSupplier, setEditingSupplier] = useState(null);
   const [loading, setLoading] = useState(false);
   const [formError, setFormError] = useState('');
+
+  // Delete Confirmation Modal State
+  const [deletingSupplier, setDeletingSupplier] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [feedback, setFeedback] = useState({ type: '', message: '' });
 
   const [formData, setFormData] = useState({
     name: '',
@@ -78,11 +83,14 @@ export default function SuppliersView({ suppliers = [], onRefresh, user }) {
     try {
       if (editingSupplier) {
         await api.updateSupplier(editingSupplier.id, formData);
+        setFeedback({ type: 'success', message: `Supplier '${formData.name}' updated successfully.` });
       } else {
         await api.createSupplier(formData);
+        setFeedback({ type: 'success', message: `Supplier '${formData.name}' registered successfully.` });
       }
       setModalOpen(false);
       onRefresh();
+      setTimeout(() => setFeedback({ type: '', message: '' }), 4000);
     } catch (err) {
       setFormError(err.message || 'Failed to save supplier');
     } finally {
@@ -90,14 +98,29 @@ export default function SuppliersView({ suppliers = [], onRefresh, user }) {
     }
   };
 
-  const handleDelete = async (id, name) => {
-    if (confirm(`Are you sure you want to deactivate supplier '${name}'?`)) {
-      try {
-        await api.deleteSupplier(id);
-        onRefresh();
-      } catch (err) {
-        alert(err.message || 'Error deactivating supplier');
-      }
+  const handleRequestDelete = (sup) => {
+    setDeletingSupplier(sup);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deletingSupplier) return;
+    setDeleteLoading(true);
+    try {
+      const res = await api.deleteSupplier(deletingSupplier.id);
+      setFeedback({
+        type: 'success',
+        message: res.message || `Supplier '${deletingSupplier.name}' deactivated successfully.`
+      });
+      setDeletingSupplier(null);
+      onRefresh();
+      setTimeout(() => setFeedback({ type: '', message: '' }), 4000);
+    } catch (err) {
+      setFeedback({
+        type: 'error',
+        message: err.message || 'Error deactivating supplier'
+      });
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -108,6 +131,7 @@ export default function SuppliersView({ suppliers = [], onRefresh, user }) {
         <div style={{ position: 'relative', width: '100%', maxWidth: '380px' }}>
           <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
           <input
+            id="input-supplier-search"
             type="text"
             className="form-input"
             style={{ paddingLeft: '2.4rem' }}
@@ -118,12 +142,48 @@ export default function SuppliersView({ suppliers = [], onRefresh, user }) {
         </div>
 
         {user?.role === 'Admin' && (
-          <button onClick={handleOpenAdd} className="btn btn-primary">
+          <button id="btn-add-supplier" onClick={handleOpenAdd} className="btn btn-primary">
             <Plus size={16} />
             <span>Add Indian Supplier</span>
           </button>
         )}
       </div>
+
+      {/* Staff Notice if in Staff Role */}
+      {user?.role !== 'Admin' && (
+        <div style={{
+          padding: '0.75rem 1rem',
+          borderRadius: 'var(--radius-md)',
+          background: 'rgba(6, 182, 212, 0.1)',
+          border: '1px solid rgba(6, 182, 212, 0.3)',
+          color: 'var(--info)',
+          fontSize: '0.85rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem'
+        }}>
+          <ShieldAlert size={16} />
+          <span><strong>Staff Operational Mode:</strong> Supplier directory is in read-only mode for Staff. Registering new procurement vendors or deactivating suppliers requires Administrator credentials.</span>
+        </div>
+      )}
+
+      {/* Feedback Banner */}
+      {feedback.message && (
+        <div style={{
+          padding: '0.75rem 1rem',
+          borderRadius: 'var(--radius-md)',
+          background: feedback.type === 'success' ? 'var(--success-bg)' : 'var(--danger-bg)',
+          border: `1px solid ${feedback.type === 'success' ? 'rgba(16, 185, 129, 0.4)' : 'rgba(239, 68, 68, 0.4)'}`,
+          color: feedback.type === 'success' ? 'var(--success)' : 'var(--danger)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+          fontSize: '0.85rem'
+        }}>
+          {feedback.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
+          <span>{feedback.message}</span>
+        </div>
+      )}
 
       {/* Suppliers Grid / Cards */}
       <div style={{
@@ -145,10 +205,20 @@ export default function SuppliersView({ suppliers = [], onRefresh, user }) {
               </div>
               {user?.role === 'Admin' && (
                 <div style={{ display: 'flex', gap: '0.35rem' }}>
-                  <button onClick={() => handleOpenEdit(sup)} className="btn btn-secondary btn-sm" title="Edit">
+                  <button
+                    id={`btn-edit-supplier-${sup.id}`}
+                    onClick={() => handleOpenEdit(sup)}
+                    className="btn btn-secondary btn-sm"
+                    title="Edit"
+                  >
                     <Edit size={14} />
                   </button>
-                  <button onClick={() => handleDelete(sup.id, sup.name)} className="btn btn-danger btn-sm" title="Delete">
+                  <button
+                    id={`btn-delete-supplier-${sup.id}`}
+                    onClick={() => handleRequestDelete(sup)}
+                    className="btn btn-danger btn-sm"
+                    title="Deactivate Supplier"
+                  >
                     <Trash2 size={14} />
                   </button>
                 </div>
@@ -166,36 +236,49 @@ export default function SuppliersView({ suppliers = [], onRefresh, user }) {
               </div>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
                 <MapPin size={14} color="var(--text-muted)" style={{ marginTop: '0.2rem', flexShrink: 0 }} />
-                <span>{sup.address}</span>
+                <span>{sup.address}, {sup.state} - {sup.pin_code}</span>
               </div>
             </div>
 
-            {/* GSTIN & State Badge */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap', paddingTop: '0.5rem', borderTop: '1px solid var(--border-color)', fontSize: '0.75rem' }}>
-              <span className="badge badge-info">
-                {sup.state || 'Tamil Nadu'} &bull; PIN: {sup.pin_code || '632007'}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              paddingTop: '0.75rem',
+              borderTop: '1px solid var(--border-color)',
+              fontSize: '0.75rem'
+            }}>
+              <div>
+                <span style={{ color: 'var(--text-muted)' }}>GSTIN: </span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{sup.gstin || 'Unregistered'}</span>
+              </div>
+              <span className="badge badge-info" style={{ fontSize: '0.7rem' }}>
+                {sup.supplied_categories || 'Electrical'}
               </span>
-              <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-muted)', fontSize: '0.725rem' }}>
-                GSTIN: <strong style={{ color: 'var(--text-primary)' }}>{sup.gstin || '33AABCS1234A1Z1'}</strong>
-              </span>
-            </div>
-
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-              <strong>Supplied:</strong> {sup.supplied_categories}
             </div>
           </div>
         ))}
+
+        {filteredSuppliers.length === 0 && (
+          <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+            No suppliers found matching your search.
+          </div>
+        )}
       </div>
 
       {/* Add / Edit Supplier Modal */}
       {modalOpen && (
         <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: '540px' }}>
+          <div className="modal-content">
             <div className="modal-header">
               <h3 style={{ fontSize: '1.1rem', fontWeight: 800 }}>
-                {editingSupplier ? 'Edit Supplier Profile' : 'Add New Indian Supplier'}
+                {editingSupplier ? 'Edit Indian Supplier' : 'Register New Indian Supplier'}
               </h3>
-              <button onClick={() => setModalOpen(false)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+              <button
+                id="btn-close-supplier-modal"
+                onClick={() => setModalOpen(false)}
+                style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+              >
                 <X size={20} />
               </button>
             </div>
@@ -210,85 +293,92 @@ export default function SuppliersView({ suppliers = [], onRefresh, user }) {
                 )}
 
                 <div className="form-group">
-                  <label className="form-label">Supplier Business Name *</label>
+                  <label className="form-label">Business / Enterprise Name *</label>
                   <input
+                    id="supplier-input-name"
                     type="text"
                     required
                     className="form-input"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="e.g. Sri Lakshmi Industrial Supplies"
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Contact Person *</label>
-                  <input
-                    type="text"
-                    required
-                    className="form-input"
-                    value={formData.contact_person}
-                    onChange={(e) => setFormData({ ...formData, contact_person: e.target.value })}
-                    placeholder="e.g. K. Sundaram"
+                    placeholder="e.g. Sri Lakshmi Electricals & Co."
                   />
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                   <div className="form-group">
-                    <label className="form-label">Phone (+91 Format) *</label>
+                    <label className="form-label">Contact Person *</label>
                     <input
+                      id="supplier-input-contact"
                       type="text"
+                      required
+                      className="form-input"
+                      value={formData.contact_person}
+                      onChange={(e) => setFormData({ ...formData, contact_person: e.target.value })}
+                      placeholder="e.g. R. Subramanian"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Indian Phone (+91) *</label>
+                    <input
+                      id="supplier-input-phone"
+                      type="tel"
                       required
                       className="form-input"
                       value={formData.phone}
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                      placeholder="+91 98421 54321"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Email *</label>
-                    <input
-                      type="email"
-                      required
-                      className="form-input"
-                      value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      placeholder="orders@srilakshmiind.in"
+                      placeholder="e.g. +91 98401 23456"
                     />
                   </div>
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Full Address (India) *</label>
+                  <label className="form-label">Email Address *</label>
                   <input
-                    type="text"
+                    id="supplier-input-email"
+                    type="email"
                     required
                     className="form-input"
-                    value={formData.address}
-                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                    placeholder="e.g. Plot 42, SIDCO Industrial Estate, Katpadi, Vellore"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    placeholder="e.g. contact@srilakshmielectricals.in"
                   />
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '1rem' }}>
+                <div className="form-group">
+                  <label className="form-label">Physical Address</label>
+                  <input
+                    id="supplier-input-address"
+                    type="text"
+                    className="form-input"
+                    value={formData.address}
+                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                    placeholder="e.g. 142 Anna Salai, Guindy Industrial Estate"
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1rem' }}>
                   <div className="form-group">
-                    <label className="form-label">State / UT *</label>
+                    <label className="form-label">State / UT (Determines GST: CGST+SGST vs IGST)</label>
                     <select
+                      id="supplier-select-state"
                       className="form-select"
                       value={formData.state}
                       onChange={(e) => setFormData({ ...formData, state: e.target.value })}
                     >
-                      {INDIAN_STATES.map((st) => (
+                      {INDIAN_STATES.map(st => (
                         <option key={st} value={st}>{st}</option>
                       ))}
                     </select>
                   </div>
+
                   <div className="form-group">
-                    <label className="form-label">PIN Code *</label>
+                    <label className="form-label">6-Digit PIN Code</label>
                     <input
+                      id="supplier-input-pincode"
                       type="text"
-                      maxLength={6}
-                      required
+                      maxLength="6"
                       className="form-input"
                       value={formData.pin_code}
                       onChange={(e) => setFormData({ ...formData, pin_code: e.target.value })}
@@ -299,20 +389,22 @@ export default function SuppliersView({ suppliers = [], onRefresh, user }) {
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                   <div className="form-group">
-                    <label className="form-label">GSTIN (15 Digits)</label>
+                    <label className="form-label">Supplier GSTIN (15 Alphanumeric)</label>
                     <input
+                      id="supplier-input-gstin"
                       type="text"
-                      maxLength={15}
+                      maxLength="15"
                       className="form-input"
                       value={formData.gstin}
                       onChange={(e) => setFormData({ ...formData, gstin: e.target.value.toUpperCase() })}
-                      placeholder="33AABCS1234A1Z1"
+                      placeholder="e.g. 33AAAAA0000A1Z5"
                     />
                   </div>
 
                   <div className="form-group">
                     <label className="form-label">Supplied Categories</label>
                     <input
+                      id="supplier-input-categories"
                       type="text"
                       className="form-input"
                       value={formData.supplied_categories}
@@ -324,14 +416,80 @@ export default function SuppliersView({ suppliers = [], onRefresh, user }) {
               </div>
 
               <div className="modal-footer">
-                <button type="button" onClick={() => setModalOpen(false)} className="btn btn-secondary">
+                <button
+                  id="btn-cancel-supplier"
+                  type="button"
+                  onClick={() => setModalOpen(false)}
+                  className="btn btn-secondary"
+                >
                   Cancel
                 </button>
-                <button type="submit" disabled={loading} className="btn btn-primary">
+                <button
+                  id="btn-submit-supplier"
+                  type="submit"
+                  disabled={loading}
+                  className="btn btn-primary"
+                >
                   {loading ? 'Saving...' : editingSupplier ? 'Update Supplier' : 'Save Supplier'}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deletingSupplier && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '460px' }}>
+            <div className="modal-header">
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <AlertCircle size={20} />
+                <span>Confirm Supplier Deactivation</span>
+              </h3>
+              <button
+                id="btn-close-delete-supplier-modal"
+                onClick={() => setDeletingSupplier(null)}
+                style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <p style={{ fontSize: '0.9rem', color: 'var(--text-primary)', marginBottom: '0.75rem' }}>
+                Are you sure you want to deactivate <strong>{deletingSupplier.name}</strong> (<span style={{ fontFamily: 'var(--font-mono)' }}>{deletingSupplier.id}</span>)?
+              </p>
+              <div style={{
+                background: 'rgba(239, 68, 68, 0.08)',
+                border: '1px solid rgba(239, 68, 68, 0.25)',
+                borderRadius: 'var(--radius-md)',
+                padding: '0.75rem',
+                fontSize: '0.8rem',
+                color: 'var(--text-secondary)'
+              }}>
+                This supplier will be removed from future inbound purchase options. All existing purchase transaction history and GST invoices referencing this supplier will remain completely intact in the ledger.
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button
+                id="btn-cancel-delete-supplier"
+                type="button"
+                onClick={() => setDeletingSupplier(null)}
+                disabled={deleteLoading}
+                className="btn btn-secondary"
+              >
+                Cancel
+              </button>
+              <button
+                id="btn-confirm-delete-supplier"
+                type="button"
+                onClick={handleConfirmDelete}
+                disabled={deleteLoading}
+                className="btn btn-danger"
+              >
+                {deleteLoading ? 'Deactivating...' : 'Confirm Deactivation'}
+              </button>
+            </div>
           </div>
         </div>
       )}

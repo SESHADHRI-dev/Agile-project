@@ -1,42 +1,80 @@
 import React, { useState, useEffect } from 'react';
-import { BrainCircuit, Play, ArrowRight, CheckCircle2, ShoppingBag, Info, Sliders } from 'lucide-react';
+import { Play, CheckCircle2, ShoppingBag, Info, Sliders, RefreshCw, AlertCircle } from 'lucide-react';
 import { api } from '../../api';
 
 export default function PredictionView({ products = [], onNavigate }) {
-  const [selectedProductId, setSelectedProductId] = useState(products[0]?.id || 'PRD-1001');
+  const [selectedProductId, setSelectedProductId] = useState(products[0]?.id || '');
   const [method, setMethod] = useState('exponential_smoothing');
   const [forecastDays, setForecastDays] = useState(30);
   const [leadTimeDays, setLeadTimeDays] = useState(7);
-  const [safetyFactor, setSafetyFactor] = useState(1.65);
+  const [safetyFactor] = useState(1.65);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
 
-  // Auto-run first prediction on mount
-  useEffect(() => {
-    if (products.length > 0) {
-      handleCalculate(products[0].id);
+  const handleCalculate = async (
+    prodId = selectedProductId,
+    targetMethod = method,
+    targetHorizon = forecastDays,
+    targetLead = leadTimeDays
+  ) => {
+    // Duplicate submission protection
+    if (loading) return;
+
+    if (!prodId) {
+      setError('Please select a target catalog product.');
+      return;
     }
-  }, [products]);
 
-  const handleCalculate = async (prodId = selectedProductId) => {
+    const horizonNum = parseInt(targetHorizon, 10);
+    const leadNum = parseInt(targetLead, 10);
+
+    if (isNaN(horizonNum) || horizonNum < 1 || horizonNum > 180) {
+      setError('Forecast horizon must be a positive number between 1 and 180 days.');
+      return;
+    }
+
+    if (isNaN(leadNum) || leadNum < 1 || leadNum > 90) {
+      setError('Supplier lead time must be a positive number between 1 and 90 days.');
+      return;
+    }
+
     setError('');
+    setSuccessMsg('');
     setLoading(true);
+
     try {
       const data = await api.calculatePrediction({
         product_id: prodId,
-        method: method,
-        forecast_days: parseInt(forecastDays, 10),
-        lead_time_days: parseInt(leadTimeDays, 10),
-        safety_stock_factor: parseFloat(safetyFactor)
+        method: targetMethod,
+        forecast_days: horizonNum,
+        lead_time_days: leadNum,
+        safety_stock_factor: parseFloat(safetyFactor) || 1.65
       });
       setResult(data);
+      setSuccessMsg(`Demand forecast computed successfully for ${data.product_name} (${data.algorithm_name}).`);
+      setTimeout(() => setSuccessMsg(''), 4500);
     } catch (err) {
-      setError(err.message || 'Error executing demand prediction algorithm');
+      const displayMsg = err.message || 'Error executing demand prediction algorithm';
+      setError(displayMsg);
+      setResult(null);
     } finally {
       setLoading(false);
     }
   };
+
+  // Keep selectedProductId in sync when products array arrives asynchronously
+  useEffect(() => {
+    if (products.length > 0) {
+      const exists = products.some(p => p.id === selectedProductId);
+      const targetId = exists ? selectedProductId : products[0].id;
+      setSelectedProductId(targetId);
+      if (!result || !exists) {
+        handleCalculate(targetId, method, forecastDays, leadTimeDays);
+      }
+    }
+  }, [products]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -44,9 +82,65 @@ export default function PredictionView({ products = [], onNavigate }) {
       <div>
         <h2 style={{ fontSize: '1.25rem', fontWeight: 800 }}>Intelligent Demand Forecasting Engine</h2>
         <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-          Ingests historical sales time-series from DynamoDB, calculates daily demand velocity, estimates lead-time safety stock, and optimizes replenishment orders.
+          Ingests historical sales time-series, calculates daily demand velocity, estimates lead-time safety stock buffers, and optimizes replenishment orders.
         </p>
       </div>
+
+      {/* Success Notification Banner */}
+      {successMsg && (
+        <div id="prediction-success-banner" style={{
+          padding: '0.75rem 1rem',
+          borderRadius: 'var(--radius-md)',
+          background: 'var(--success-bg)',
+          border: '1px solid rgba(16, 185, 129, 0.4)',
+          color: 'var(--success)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '0.5rem',
+          fontSize: '0.85rem'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <CheckCircle2 size={16} />
+            <span>{successMsg}</span>
+          </div>
+          <button
+            onClick={() => setSuccessMsg('')}
+            style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0 }}
+            title="Dismiss success notification"
+          >
+            &times;
+          </button>
+        </div>
+      )}
+
+      {/* Error Notification Banner */}
+      {error && (
+        <div id="prediction-error-banner" style={{
+          padding: '0.75rem 1rem',
+          borderRadius: 'var(--radius-md)',
+          background: 'var(--danger-bg)',
+          border: '1px solid rgba(239, 68, 68, 0.4)',
+          color: 'var(--danger)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '0.5rem',
+          fontSize: '0.85rem'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <AlertCircle size={16} />
+            <span>{error}</span>
+          </div>
+          <button
+            onClick={() => setError('')}
+            style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0 }}
+            title="Dismiss error message"
+          >
+            &times;
+          </button>
+        </div>
+      )}
 
       {/* Control Panel */}
       <div className="glass-card" style={{ padding: '1.5rem' }}>
@@ -58,13 +152,15 @@ export default function PredictionView({ products = [], onNavigate }) {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem' }}>
           {/* Product Select */}
           <div className="form-group" style={{ marginBottom: 0 }}>
-            <label className="form-label">Target Product</label>
+            <label className="form-label">Target Product *</label>
             <select
+              id="prediction-product-select"
               className="form-select"
               value={selectedProductId}
               onChange={(e) => {
-                setSelectedProductId(e.target.value);
-                handleCalculate(e.target.value);
+                const newId = e.target.value;
+                setSelectedProductId(newId);
+                handleCalculate(newId, method, forecastDays, leadTimeDays);
               }}
             >
               {products.map((p) => (
@@ -72,16 +168,24 @@ export default function PredictionView({ products = [], onNavigate }) {
                   {p.name} ({p.id}) — Stock: {p.quantity}
                 </option>
               ))}
+              {products.length === 0 && (
+                <option value="">No catalog products available</option>
+              )}
             </select>
           </div>
 
           {/* Algorithm Select */}
           <div className="form-group" style={{ marginBottom: 0 }}>
-            <label className="form-label">Forecasting Algorithm</label>
+            <label className="form-label">Forecasting Algorithm *</label>
             <select
+              id="prediction-method-select"
               className="form-select"
               value={method}
-              onChange={(e) => setMethod(e.target.value)}
+              onChange={(e) => {
+                const newMethod = e.target.value;
+                setMethod(newMethod);
+                handleCalculate(selectedProductId, newMethod, forecastDays, leadTimeDays);
+              }}
             >
               <option value="exponential_smoothing">Single Exponential Smoothing (SES, &alpha;=0.3)</option>
               <option value="weighted_moving_average">Weighted Moving Average (WMA, Recency Bias)</option>
@@ -91,39 +195,59 @@ export default function PredictionView({ products = [], onNavigate }) {
 
           {/* Forecast Horizon */}
           <div className="form-group" style={{ marginBottom: 0 }}>
-            <label className="form-label">Forecast Horizon (Days)</label>
+            <label className="form-label">Forecast Horizon (Days) *</label>
             <input
+              id="prediction-forecast-days"
               type="number"
-              min="7"
-              max="90"
+              min="1"
+              max="180"
+              required
               className="form-input"
               value={forecastDays}
-              onChange={(e) => setForecastDays(e.target.value)}
+              onChange={(e) => {
+                setForecastDays(e.target.value);
+                if (error && error.includes('Forecast horizon')) setError('');
+              }}
             />
           </div>
 
           {/* Supplier Lead Time */}
           <div className="form-group" style={{ marginBottom: 0 }}>
-            <label className="form-label">Supplier Lead Time (Days)</label>
+            <label className="form-label">Supplier Lead Time (Days) *</label>
             <input
+              id="prediction-lead-time"
               type="number"
               min="1"
-              max="60"
+              max="90"
+              required
               className="form-input"
               value={leadTimeDays}
-              onChange={(e) => setLeadTimeDays(e.target.value)}
+              onChange={(e) => {
+                setLeadTimeDays(e.target.value);
+                if (error && error.includes('Supplier lead time')) setError('');
+              }}
             />
           </div>
         </div>
 
-        <div style={{ marginTop: '1.25rem', display: 'flex', justifyContent: 'flex-end' }}>
+        <div style={{ marginTop: '1.25rem', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
           <button
-            onClick={() => handleCalculate(selectedProductId)}
-            disabled={loading}
+            id="btn-run-prediction"
+            onClick={() => handleCalculate(selectedProductId, method, forecastDays, leadTimeDays)}
+            disabled={loading || !selectedProductId || products.length === 0}
             className="btn btn-primary"
           >
-            <Play size={16} />
-            <span>{loading ? 'Executing ML Pipeline...' : 'Run Demand Forecast'}</span>
+            {loading ? (
+              <>
+                <RefreshCw size={16} className="spin-animation" />
+                <span>Executing ML Pipeline...</span>
+              </>
+            ) : (
+              <>
+                <Play size={16} />
+                <span>Run Demand Forecast</span>
+              </>
+            )}
           </button>
         </div>
       </div>
@@ -211,14 +335,15 @@ export default function PredictionView({ products = [], onNavigate }) {
               </div>
             </div>
 
-            {result.recommended_restock > 0 && (
+            {result.recommended_restock > 0 && onNavigate && (
               <div style={{ marginTop: '1.25rem', display: 'flex', justifyContent: 'flex-end' }}>
                 <button
+                  id="btn-order-replenishment-from-prediction"
                   onClick={() => onNavigate('purchases')}
                   className="btn btn-primary"
                 >
                   <ShoppingBag size={16} />
-                  <span>Create Purchase Order for {result.recommended_restock} Units</span>
+                  <span>Order Restock via Inbound Purchases ({result.recommended_restock} units)</span>
                 </button>
               </div>
             )}

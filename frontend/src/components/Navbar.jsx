@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sun, Moon, ShieldCheck, UserCheck, Database, LogOut, RefreshCw, KeyRound, Cloud, Menu } from 'lucide-react';
+import { Sun, Moon, ShieldCheck, UserCheck, Database, LogOut, RefreshCw, KeyRound, Cloud, Menu, Clock } from 'lucide-react';
 
 export default function Navbar({
   activeTitle,
@@ -10,10 +10,17 @@ export default function Navbar({
   onLogout,
   authConfig,
   user,
-  onToggleMobileMenu
+  onToggleMobileMenu,
+  isSyncing = false,
+  lastSyncTime = ''
 }) {
   const isLocalAuth = !authConfig || authConfig.is_local;
   const isLocalStorage = !authConfig || authConfig.storage_mode === 'local';
+
+  // Parse clean display name for header
+  const displayName = user?.name
+    ? user.name.replace(/\s*\([^)]*\)/, '')
+    : (user?.role === 'Admin' ? 'Dr. S. Sharma' : 'Seshadhri');
 
   return (
     <header style={{
@@ -85,8 +92,8 @@ export default function Navbar({
           <span>DB: {isLocalStorage ? 'LOCAL SQLITE' : 'DYNAMODB'}</span>
         </div>
 
-        {/* Active Role Pill */}
-        <div style={{
+        {/* Active User & Role Pill */}
+        <div id="navbar-user-badge" style={{
           display: 'flex',
           alignItems: 'center',
           gap: '0.35rem',
@@ -99,22 +106,40 @@ export default function Navbar({
           color: user?.role === 'Admin' ? 'var(--accent-primary)' : 'var(--info)'
         }}>
           {user?.role === 'Admin' ? <ShieldCheck size={14} /> : <UserCheck size={14} />}
-          <span>{user?.role || 'Admin'}</span>
+          <span>{displayName} ({user?.role || 'Admin'})</span>
         </div>
 
-        {/* Refresh Button */}
+        {/* Last Sync Indicator */}
+        {lastSyncTime && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.3rem',
+            fontSize: '0.7rem',
+            color: 'var(--text-muted)',
+            fontFamily: 'var(--font-mono)'
+          }} title="Last successful synchronization with local SQLite & in-memory state in Indian Standard Time">
+            <Clock size={12} />
+            <span>{lastSyncTime}</span>
+          </div>
+        )}
+
+        {/* Sync Button */}
         <button
+          id="btn-sync-data"
           onClick={onRefresh}
+          disabled={isSyncing}
           className="btn btn-secondary btn-sm"
-          title="Refresh All Data"
+          title={`Click to synchronize with backend • Last synced: ${lastSyncTime || 'Pending'}`}
           style={{ padding: '0.45rem 0.7rem' }}
         >
-          <RefreshCw size={14} />
-          <span>Sync</span>
+          <RefreshCw size={14} className={isSyncing ? "spin-animation" : ""} />
+          <span>{isSyncing ? 'Syncing...' : 'Sync'}</span>
         </button>
 
         {/* Theme Toggle */}
         <button
+          id="btn-toggle-theme"
           onClick={toggleTheme}
           className="btn btn-secondary btn-sm"
           title="Toggle Dark/Light Mode"
@@ -125,6 +150,7 @@ export default function Navbar({
 
         {/* Logout */}
         <button
+          id="btn-logout"
           onClick={onLogout}
           className="btn btn-secondary btn-sm"
           title="Log Out"

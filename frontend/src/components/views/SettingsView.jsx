@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Settings, ShieldCheck, Database, RefreshCw, CheckCircle2, Cloud, Server, AlertCircle } from 'lucide-react';
+import { Settings, ShieldCheck, UserCheck, Database, RefreshCw, CheckCircle2, Cloud, Server, AlertCircle } from 'lucide-react';
 import { api } from '../../api';
 
 export default function SettingsView({ user, onSwitchUser, onRefreshAll }) {
@@ -43,6 +43,7 @@ export default function SettingsView({ user, onSwitchUser, onRefreshAll }) {
 
         <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
           <button
+            id="btn-switch-admin"
             onClick={() => onSwitchUser('admin@intellistock.in')}
             className={`btn ${user?.role === 'Admin' ? 'btn-primary' : 'btn-secondary'}`}
           >
@@ -51,10 +52,12 @@ export default function SettingsView({ user, onSwitchUser, onRefreshAll }) {
           </button>
 
           <button
+            id="btn-switch-staff"
             onClick={() => onSwitchUser('staff@intellistock.in')}
             className={`btn ${user?.role === 'Staff' ? 'btn-primary' : 'btn-secondary'}`}
           >
-            <span>Switch to Operations Staff (Arun Kumar)</span>
+            <UserCheck size={16} />
+            <span>Switch to Operations Staff (Seshadhri)</span>
           </button>
         </div>
       </div>
@@ -76,14 +79,22 @@ export default function SettingsView({ user, onSwitchUser, onRefreshAll }) {
           </div>
         )}
 
-        <button
-          onClick={handleReseed}
-          disabled={seeding}
-          className="btn btn-secondary"
-        >
-          <RefreshCw size={15} />
-          <span>{seeding ? 'Reseeding Data...' : 'Reset & Reseed Demo Data'}</span>
-        </button>
+        {user?.role !== 'Admin' ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+            <AlertCircle size={15} color="var(--warning)" />
+            <span>Dataset reseeding is restricted to Administrator role (Dr. S. Sharma).</span>
+          </div>
+        ) : (
+          <button
+            id="btn-reseed-data"
+            onClick={handleReseed}
+            disabled={seeding}
+            className="btn btn-secondary"
+          >
+            <RefreshCw size={15} className={seeding ? "spin-animation" : ""} />
+            <span>{seeding ? 'Reseeding Data...' : 'Reset & Reseed Demo Data'}</span>
+          </button>
+        )}
       </div>
 
       {/* Cloud & Architecture Details */}

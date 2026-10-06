@@ -1,4 +1,5 @@
-import { Plus, Search, Filter, Edit, Trash2, X, AlertCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { Plus, Search, Filter, Edit, Trash2, X, AlertCircle, CheckCircle2, ShieldAlert } from 'lucide-react';
 import { api } from '../../api';
 import { formatINR, INDIAN_PRODUCT_CATEGORIES } from '../../utils/formatters';
 
@@ -9,6 +10,11 @@ export default function ProductsView({ products = [], suppliers = [], onRefresh,
   const [editingProduct, setEditingProduct] = useState(null);
   const [loading, setLoading] = useState(false);
   const [formError, setFormError] = useState('');
+
+  // Delete Confirmation Modal State
+  const [deletingProduct, setDeletingProduct] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [feedback, setFeedback] = useState({ type: '', message: '' });
 
   const [formData, setFormData] = useState({
     name: '',
@@ -23,10 +29,32 @@ export default function ProductsView({ products = [], suppliers = [], onRefresh,
 
   const categories = ['ALL', ...INDIAN_PRODUCT_CATEGORIES];
 
+  // Self-heal / fetch data on mount if products list is currently empty
+  React.useEffect(() => {
+    if (products.length === 0 && onRefresh) {
+      onRefresh();
+    }
+  }, []);
+
+  const cleanSearch = searchTerm.trim().toLowerCase();
+  const cleanCat = categoryFilter.trim().toLowerCase();
+
   const filteredProducts = products.filter((p) => {
-    const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          p.id.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCat = categoryFilter === 'ALL' || p.category === categoryFilter;
+    if (!p) return false;
+    const pName = (p.name || '').toLowerCase();
+    const pId = (p.id || '').toLowerCase();
+    const pHsn = (p.hsn_code || '').toLowerCase();
+    const pCat = (p.category || '').toLowerCase();
+    const pSupplier = (p.supplier_name || '').toLowerCase();
+
+    const matchesSearch = !cleanSearch ||
+      pName.includes(cleanSearch) ||
+      pId.includes(cleanSearch) ||
+      pHsn.includes(cleanSearch) ||
+      pSupplier.includes(cleanSearch) ||
+      pCat.includes(cleanSearch);
+
+    const matchesCat = cleanCat === 'all' || pCat === cleanCat;
     return matchesSearch && matchesCat;
   });
 
@@ -81,11 +109,14 @@ export default function ProductsView({ products = [], suppliers = [], onRefresh,
 
       if (editingProduct) {
         await api.updateProduct(editingProduct.id, payload);
+        setFeedback({ type: 'success', message: `Product '${payload.name}' updated successfully.` });
       } else {
         await api.createProduct(payload);
+        setFeedback({ type: 'success', message: `Product '${payload.name}' created successfully.` });
       }
       setModalOpen(false);
       onRefresh();
+      setTimeout(() => setFeedback({ type: '', message: '' }), 4000);
     } catch (err) {
       setFormError(err.message || 'Failed to save product');
     } finally {
@@ -93,14 +124,29 @@ export default function ProductsView({ products = [], suppliers = [], onRefresh,
     }
   };
 
-  const handleDelete = async (id, name) => {
-    if (confirm(`Are you sure you want to deactivate product '${name}'?`)) {
-      try {
-        await api.deleteProduct(id);
-        onRefresh();
-      } catch (err) {
-        alert(err.message || 'Error deactivating product');
-      }
+  const handleRequestDelete = (prod) => {
+    setDeletingProduct(prod);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deletingProduct) return;
+    setDeleteLoading(true);
+    try {
+      const res = await api.deleteProduct(deletingProduct.id);
+      setFeedback({
+        type: 'success',
+        message: res.message || `Product '${deletingProduct.name}' deactivated successfully.`
+      });
+      setDeletingProduct(null);
+      onRefresh();
+      setTimeout(() => setFeedback({ type: '', message: '' }), 4000);
+    } catch (err) {
+      setFeedback({
+        type: 'error',
+        message: err.message || 'Error deactivating product'
+      });
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -113,6 +159,7 @@ export default function ProductsView({ products = [], suppliers = [], onRefresh,
           <div style={{ position: 'relative', flex: 1, maxWidth: '360px' }}>
             <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
             <input
+              id="product-search-input"
               type="text"
               className="form-input"
               style={{ paddingLeft: '2.4rem' }}
@@ -124,67 +171,113 @@ export default function ProductsView({ products = [], suppliers = [], onRefresh,
 
           {/* Category Filter */}
           <select
+            id="product-category-filter"
             className="form-select"
             style={{ maxWidth: '200px' }}
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
           >
             {categories.map((c) => (
-              <option key={c} value={c}>{c === 'ALL' ? 'All Categories' : c}</option>
+              <option key={c} value={c}>{c}</option>
             ))}
           </select>
         </div>
 
+        {/* Add Product Button (Admin Only) */}
         {user?.role === 'Admin' && (
-          <button onClick={handleOpenAdd} className="btn btn-primary">
+          <button id="btn-open-add-product" onClick={handleOpenAdd} className="btn btn-primary">
             <Plus size={16} />
             <span>Add Product</span>
           </button>
         )}
       </div>
 
+      {/* Staff Notice if in Staff Role */}
+      {user?.role !== 'Admin' && (
+        <div style={{
+          padding: '0.75rem 1rem',
+          borderRadius: 'var(--radius-md)',
+          background: 'rgba(6, 182, 212, 0.1)',
+          border: '1px solid rgba(6, 182, 212, 0.3)',
+          color: 'var(--info)',
+          fontSize: '0.85rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem'
+        }}>
+          <ShieldAlert size={16} />
+          <span><strong>Staff Operational Mode:</strong> You are viewing the product catalogue in read-only mode. Adding new SKUs, editing attributes, and deactivating products require Administrator privileges.</span>
+        </div>
+      )}
+
+      {/* Feedback Banner */}
+      {feedback.message && (
+        <div style={{
+          padding: '0.75rem 1rem',
+          borderRadius: 'var(--radius-md)',
+          background: feedback.type === 'success' ? 'var(--success-bg)' : 'var(--danger-bg)',
+          border: `1px solid ${feedback.type === 'success' ? 'rgba(16, 185, 129, 0.4)' : 'rgba(239, 68, 68, 0.4)'}`,
+          color: feedback.type === 'success' ? 'var(--success)' : 'var(--danger)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+          fontSize: '0.85rem'
+        }}>
+          {feedback.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
+          <span>{feedback.message}</span>
+        </div>
+      )}
+
       {/* Products Table */}
       <div className="table-container">
         <table>
           <thead>
             <tr>
-              <th>ID</th>
+              <th>SKU / ID</th>
               <th>Product Name</th>
               <th>Category</th>
-              <th>HSN</th>
-              <th>Price (₹)</th>
-              <th>Quantity</th>
-              <th>Min Stock</th>
-              <th>Status</th>
-              <th>GST</th>
-              <th>Supplier</th>
+              <th>Unit Price (₹)</th>
+              <th>Stock</th>
+              <th>Min Threshold</th>
+              <th>GST Rate</th>
+              <th>Default Supplier</th>
               {user?.role === 'Admin' && <th style={{ textAlign: 'right' }}>Actions</th>}
             </tr>
           </thead>
           <tbody>
             {filteredProducts.map((p) => {
-              let badgeClass = 'badge-in-stock';
-              if (p.status === 'LOW STOCK') badgeClass = 'badge-low-stock';
-              if (p.status === 'OUT OF STOCK') badgeClass = 'badge-out-of-stock';
+              let badge = 'badge-in-stock';
+              if (p.quantity === 0) badge = 'badge-out-of-stock';
+              else if (p.quantity <= p.min_stock_level) badge = 'badge-low-stock';
 
               return (
                 <tr key={p.id}>
                   <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                     {p.id}
                   </td>
-                  <td style={{ fontWeight: 700 }}>{p.name}</td>
-                  <td><span className="badge badge-info">{p.category}</span></td>
-                  <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--text-muted)' }}>{p.hsn_code || '8536'}</td>
+                  <td>
+                    <div style={{ fontWeight: 700 }}>{p.name}</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>HSN: {p.hsn_code || '8536'}</div>
+                  </td>
+                  <td>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                      {p.category}
+                    </span>
+                  </td>
                   <td style={{ fontWeight: 700 }}>{formatINR(p.price)}</td>
-                  <td style={{ fontWeight: 700 }}>{p.quantity}</td>
-                  <td style={{ color: 'var(--text-secondary)' }}>{p.min_stock_level}</td>
-                  <td><span className={`badge ${badgeClass}`}>{p.status}</span></td>
+                  <td>
+                    <span className={`badge ${badge}`}>
+                      {p.quantity} units
+                    </span>
+                  </td>
+                  <td style={{ color: 'var(--text-muted)' }}>{p.min_stock_level} units</td>
                   <td><span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{p.gst_rate || 18}%</span></td>
                   <td style={{ color: 'var(--text-secondary)' }}>{p.supplier_name || '—'}</td>
                   {user?.role === 'Admin' && (
                     <td style={{ textAlign: 'right' }}>
                       <div style={{ display: 'inline-flex', gap: '0.5rem' }}>
                         <button
+                          id={`btn-edit-product-${p.id}`}
                           onClick={() => handleOpenEdit(p)}
                           className="btn btn-secondary btn-sm"
                           title="Edit Product"
@@ -192,7 +285,8 @@ export default function ProductsView({ products = [], suppliers = [], onRefresh,
                           <Edit size={14} />
                         </button>
                         <button
-                          onClick={() => handleDelete(p.id, p.name)}
+                          id={`btn-delete-product-${p.id}`}
+                          onClick={() => handleRequestDelete(p)}
                           className="btn btn-danger btn-sm"
                           title="Deactivate Product"
                         >
@@ -206,8 +300,48 @@ export default function ProductsView({ products = [], suppliers = [], onRefresh,
             })}
             {filteredProducts.length === 0 && (
               <tr>
-                <td colSpan={user?.role === 'Admin' ? 9 : 8} style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-muted)' }}>
-                  No products found matching your search and filter criteria.
+                <td colSpan={user?.role === 'Admin' ? 9 : 8} style={{ textAlign: 'center', padding: '3rem 1.5rem', color: 'var(--text-muted)' }}>
+                  {products.length === 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
+                      <AlertCircle size={32} style={{ color: 'var(--text-muted)' }} />
+                      <div style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                        No Products Currently Loaded
+                      </div>
+                      <div style={{ fontSize: '0.85rem', maxWidth: '400px', color: 'var(--text-secondary)' }}>
+                        The catalog has no active products loaded in memory. Click the button below to synchronize with the local database.
+                      </div>
+                      {onRefresh && (
+                        <button
+                          type="button"
+                          id="btn-retry-catalog-sync"
+                          onClick={onRefresh}
+                          className="btn btn-secondary"
+                          style={{ marginTop: '0.5rem' }}
+                        >
+                          Synchronize Catalog Now
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
+                      <Search size={32} style={{ color: 'var(--text-muted)' }} />
+                      <div style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                        No products found matching your search and filter criteria.
+                      </div>
+                      <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                        No products match your search term "{searchTerm}" and category "{categoryFilter}".
+                      </div>
+                      <button
+                        type="button"
+                        id="btn-clear-catalog-filters"
+                        onClick={() => { setSearchTerm(''); setCategoryFilter('ALL'); }}
+                        className="btn btn-secondary btn-sm"
+                        style={{ marginTop: '0.5rem' }}
+                      >
+                        Clear Search & Filter
+                      </button>
+                    </div>
+                  )}
                 </td>
               </tr>
             )}
@@ -221,9 +355,10 @@ export default function ProductsView({ products = [], suppliers = [], onRefresh,
           <div className="modal-content">
             <div className="modal-header">
               <h3 style={{ fontSize: '1.1rem', fontWeight: 800 }}>
-                {editingProduct ? 'Edit Product' : 'Add New Product'}
+                {editingProduct ? 'Edit Catalog Product' : 'Add New Indian SKU'}
               </h3>
               <button
+                id="btn-close-product-modal"
                 onClick={() => setModalOpen(false)}
                 style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
               >
@@ -234,17 +369,7 @@ export default function ProductsView({ products = [], suppliers = [], onRefresh,
             <form onSubmit={handleSubmit}>
               <div className="modal-body">
                 {formError && (
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    background: 'var(--danger-bg)',
-                    color: 'var(--danger)',
-                    padding: '0.75rem',
-                    borderRadius: 'var(--radius-md)',
-                    marginBottom: '1rem',
-                    fontSize: '0.85rem'
-                  }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--danger-bg)', color: 'var(--danger)', padding: '0.75rem', borderRadius: 'var(--radius-md)', marginBottom: '1rem', fontSize: '0.85rem' }}>
                     <AlertCircle size={16} />
                     <span>{formError}</span>
                   </div>
@@ -253,12 +378,13 @@ export default function ProductsView({ products = [], suppliers = [], onRefresh,
                 <div className="form-group">
                   <label className="form-label">Product Name *</label>
                   <input
+                    id="prod-name"
                     type="text"
                     required
                     className="form-input"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="e.g. LED Bulb 9W Cool Day White"
+                    placeholder="e.g. Havells Industrial LED High-Bay 100W"
                   />
                 </div>
 
@@ -270,15 +396,16 @@ export default function ProductsView({ products = [], suppliers = [], onRefresh,
                       value={formData.category}
                       onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                     >
-                      {categories.filter(c => c !== 'ALL').map(c => (
+                      {INDIAN_PRODUCT_CATEGORIES.map(c => (
                         <option key={c} value={c}>{c}</option>
                       ))}
                     </select>
                   </div>
 
                   <div className="form-group">
-                    <label className="form-label">Unit Price (₹) *</label>
+                    <label className="form-label">Unit Price (₹ INR) *</label>
                     <input
+                      id="prod-price"
                       type="number"
                       step="0.01"
                       min="0.01"
@@ -286,64 +413,62 @@ export default function ProductsView({ products = [], suppliers = [], onRefresh,
                       className="form-input"
                       value={formData.price}
                       onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                      placeholder="0.00"
                     />
-                  </div>
-                </div>
-
-                {/* India / GST Fields: HSN Code & GST Rate */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                  <div className="form-group">
-                    <label className="form-label">HSN/SAC Code</label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      value={formData.hsn_code}
-                      onChange={(e) => setFormData({ ...formData, hsn_code: e.target.value })}
-                      placeholder="e.g. 8539"
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label">GST Rate (%)</label>
-                    <select
-                      className="form-select"
-                      value={formData.gst_rate}
-                      onChange={(e) => setFormData({ ...formData, gst_rate: e.target.value })}
-                    >
-                      <option value="5">5% (Essential Goods)</option>
-                      <option value="12">12% (Packaging / Office Supplies)</option>
-                      <option value="18">18% (Standard Industrial / Electrical)</option>
-                      <option value="28">28% (Luxury / Specialized Equipment)</option>
-                    </select>
                   </div>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                   <div className="form-group">
-                    <label className="form-label">Initial Quantity *</label>
+                    <label className="form-label">Initial Physical Stock *</label>
                     <input
+                      id="prod-qty"
                       type="number"
                       min="0"
                       required
                       className="form-input"
                       value={formData.quantity}
                       onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
-                      placeholder="0"
                     />
                   </div>
 
                   <div className="form-group">
-                    <label className="form-label">Min Stock Level *</label>
+                    <label className="form-label">Minimum Stock Threshold *</label>
                     <input
+                      id="prod-min-qty"
                       type="number"
                       min="0"
                       required
                       className="form-input"
                       value={formData.min_stock_level}
                       onChange={(e) => setFormData({ ...formData, min_stock_level: e.target.value })}
-                      placeholder="e.g. 20"
                     />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div className="form-group">
+                    <label className="form-label">HSN Code</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={formData.hsn_code}
+                      onChange={(e) => setFormData({ ...formData, hsn_code: e.target.value })}
+                      placeholder="e.g. 8536"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Applicable GST Rate (%)</label>
+                    <select
+                      className="form-select"
+                      value={formData.gst_rate}
+                      onChange={(e) => setFormData({ ...formData, gst_rate: e.target.value })}
+                    >
+                      <option value="5.0">5% (Essential Goods)</option>
+                      <option value="12.0">12% (Standard Low)</option>
+                      <option value="18.0">18% (Standard Electronics/Electrical)</option>
+                      <option value="28.0">28% (Luxury / High Power)</option>
+                    </select>
                   </div>
                 </div>
 
@@ -354,7 +479,7 @@ export default function ProductsView({ products = [], suppliers = [], onRefresh,
                     value={formData.supplier_id}
                     onChange={(e) => setFormData({ ...formData, supplier_id: e.target.value })}
                   >
-                    <option value="">Select Supplier...</option>
+                    <option value="">— Select Supplier —</option>
                     {suppliers.map(s => (
                       <option key={s.id} value={s.id}>{s.name} ({s.contact_person})</option>
                     ))}
@@ -364,6 +489,7 @@ export default function ProductsView({ products = [], suppliers = [], onRefresh,
 
               <div className="modal-footer">
                 <button
+                  id="btn-cancel-product"
                   type="button"
                   onClick={() => setModalOpen(false)}
                   className="btn btn-secondary"
@@ -371,6 +497,7 @@ export default function ProductsView({ products = [], suppliers = [], onRefresh,
                   Cancel
                 </button>
                 <button
+                  id="btn-submit-product"
                   type="submit"
                   disabled={loading}
                   className="btn btn-primary"
@@ -379,6 +506,62 @@ export default function ProductsView({ products = [], suppliers = [], onRefresh,
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deletingProduct && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '460px' }}>
+            <div className="modal-header">
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <AlertCircle size={20} />
+                <span>Confirm Product Deactivation</span>
+              </h3>
+              <button
+                id="btn-close-delete-modal"
+                onClick={() => setDeletingProduct(null)}
+                style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <p style={{ fontSize: '0.9rem', color: 'var(--text-primary)', marginBottom: '0.75rem' }}>
+                Are you sure you want to deactivate <strong>{deletingProduct.name}</strong> (<span style={{ fontFamily: 'var(--font-mono)' }}>{deletingProduct.id}</span>)?
+              </p>
+              <div style={{
+                background: 'rgba(239, 68, 68, 0.08)',
+                border: '1px solid rgba(239, 68, 68, 0.25)',
+                borderRadius: 'var(--radius-md)',
+                padding: '0.75rem',
+                fontSize: '0.8rem',
+                color: 'var(--text-secondary)'
+              }}>
+                This SKU will be hidden from the active catalog and inventory operations. All historical procurement batches and sales transactions referencing this SKU will remain completely preserved in the ledger.
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button
+                id="btn-cancel-delete-product"
+                type="button"
+                onClick={() => setDeletingProduct(null)}
+                disabled={deleteLoading}
+                className="btn btn-secondary"
+              >
+                Cancel
+              </button>
+              <button
+                id="btn-confirm-delete-product"
+                type="button"
+                onClick={handleConfirmDelete}
+                disabled={deleteLoading}
+                className="btn btn-danger"
+              >
+                {deleteLoading ? 'Deactivating...' : 'Confirm Deactivation'}
+              </button>
+            </div>
           </div>
         </div>
       )}

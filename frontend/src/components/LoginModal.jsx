@@ -126,7 +126,7 @@ export default function LoginModal({ onLoginSuccess }) {
                 style={{ fontSize: '0.75rem' }}
               >
                 <UserCheck size={14} color="var(--info)" />
-                <span>Staff (Arun Kumar)</span>
+                <span>Staff (Seshadhri)</span>
               </button>
             </div>
           </div>

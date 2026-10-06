@@ -3,7 +3,15 @@ import { Plus, ShoppingBag, X, CheckCircle2, AlertCircle } from 'lucide-react';
 import { api } from '../../api';
 import { formatINR, formatIndianDateTime } from '../../utils/formatters';
 
-export default function PurchasesView({ purchases = [], products = [], suppliers = [], onRefresh }) {
+export default function PurchasesView({
+  purchases = [],
+  products = [],
+  suppliers = [],
+  onRefresh,
+  user,
+  replenishTarget = null,
+  onClearReplenishTarget
+}) {
   const [modalOpen, setModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -16,19 +24,39 @@ export default function PurchasesView({ purchases = [], products = [], suppliers
     unit_cost: ''
   });
 
-  const handleOpenModal = () => {
-    const defaultProd = products[0]?.id || '';
-    const defaultSup = suppliers[0]?.id || '';
-    const prodObj = products[0];
+  const handleOpenModal = (targetProductId = null, suggestedQty = null) => {
+    const pId = targetProductId || products[0]?.id || '';
+    const prodObj = products.find(p => p.id === pId) || products[0];
+    const defaultSup = prodObj?.supplier_id || suppliers[0]?.id || '';
     setFormData({
-      product_id: defaultProd,
+      product_id: pId,
       supplier_id: defaultSup,
-      quantity: 50,
+      quantity: suggestedQty || 50,
       unit_cost: prodObj ? prodObj.price : 120.00
     });
     setError('');
     setMessage('');
     setModalOpen(true);
+  };
+
+  // Watch for pre-selected replenishment target from Low-Stock Alerts or Dashboard
+  React.useEffect(() => {
+    if (replenishTarget && replenishTarget.product_id) {
+      handleOpenModal(replenishTarget.product_id, replenishTarget.quantity);
+      if (onClearReplenishTarget) {
+        onClearReplenishTarget();
+      }
+    }
+  }, [replenishTarget]);
+
+  const handleProductChange = (pId) => {
+    const prod = products.find(p => p.id === pId);
+    setFormData({
+      ...formData,
+      product_id: pId,
+      supplier_id: prod?.supplier_id || formData.supplier_id,
+      unit_cost: prod ? prod.price : formData.unit_cost
+    });
   };
 
   const selectedProduct = products.find(p => p.id === formData.product_id);
@@ -50,10 +78,12 @@ export default function PurchasesView({ purchases = [], products = [], suppliers
         unit_cost: parseFloat(formData.unit_cost)
       });
       setMessage(res.message);
-      onRefresh();
+      if (onRefresh) {
+        await onRefresh();
+      }
       setTimeout(() => {
         setModalOpen(false);
-      }, 1400);
+      }, 1200);
     } catch (err) {
       setError(err.message || 'Error recording purchase order');
     } finally {
@@ -70,10 +100,12 @@ export default function PurchasesView({ purchases = [], products = [], suppliers
             Record replenishment orders from suppliers. Automatically increments inventory stock balance.
           </p>
         </div>
-        <button onClick={handleOpenModal} className="btn btn-primary">
-          <Plus size={16} />
-          <span>Record New Purchase</span>
-        </button>
+        {user?.role === 'Admin' && (
+          <button id="btn-open-purchase-modal" onClick={handleOpenModal} className="btn btn-primary">
+            <Plus size={16} />
+            <span>Record New Purchase</span>
+          </button>
+        )}
       </div>
 
       {/* Purchases Table */}
@@ -147,17 +179,10 @@ export default function PurchasesView({ purchases = [], products = [], suppliers
                 <div className="form-group">
                   <label className="form-label">Select Product *</label>
                   <select
+                    id="purchase-select-product"
                     className="form-select"
                     value={formData.product_id}
-                    onChange={(e) => {
-                      const pId = e.target.value;
-                      const pObj = products.find(p => p.id === pId);
-                      setFormData({ 
-                        ...formData, 
-                        product_id: pId,
-                        unit_cost: pObj ? pObj.price : formData.unit_cost
-                      });
-                    }}
+                    onChange={(e) => handleProductChange(e.target.value)}
                     required
                   >
                     {products.map(p => (
@@ -171,13 +196,14 @@ export default function PurchasesView({ purchases = [], products = [], suppliers
                 <div className="form-group">
                   <label className="form-label">Select Supplier *</label>
                   <select
+                    id="purchase-select-supplier"
                     className="form-select"
                     value={formData.supplier_id}
                     onChange={(e) => setFormData({ ...formData, supplier_id: e.target.value })}
                     required
                   >
                     {suppliers.map(s => (
-                      <option key={s.id} value={s.id}>{s.name} ({s.city}, {s.state})</option>
+                      <option key={s.id} value={s.id}>{s.name} ({s.state || 'Tamil Nadu'})</option>
                     ))}
                   </select>
                 </div>
@@ -186,6 +212,7 @@ export default function PurchasesView({ purchases = [], products = [], suppliers
                   <div className="form-group">
                     <label className="form-label">Purchase Quantity *</label>
                     <input
+                      id="purchase-input-quantity"
                       type="number"
                       min="1"
                       required
@@ -198,6 +225,7 @@ export default function PurchasesView({ purchases = [], products = [], suppliers
                   <div className="form-group">
                     <label className="form-label">Unit Cost (₹) *</label>
                     <input
+                      id="purchase-input-cost"
                       type="number"
                       step="0.01"
                       min="0.01"
@@ -228,10 +256,10 @@ export default function PurchasesView({ purchases = [], products = [], suppliers
               </div>
 
               <div className="modal-footer">
-                <button type="button" onClick={() => setModalOpen(false)} className="btn btn-secondary">
+                <button id="btn-cancel-purchase" type="button" onClick={() => setModalOpen(false)} className="btn btn-secondary">
                   Cancel
                 </button>
-                <button type="submit" disabled={loading} className="btn btn-primary">
+                <button id="btn-submit-purchase" type="submit" disabled={loading} className="btn btn-primary">
                   {loading ? 'Processing...' : 'Confirm & Increment Stock'}
                 </button>
               </div>

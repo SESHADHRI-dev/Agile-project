@@ -122,28 +122,28 @@ export default function DashboardView({
         </div>
 
         {/* Card 4: Low Stock Products */}
-        <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        <div id="kpi-card-low-stock" className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>LOW STOCK DEFICIT</span>
             <div style={{ padding: '0.4rem', borderRadius: '8px', background: 'var(--warning-bg)', color: 'var(--warning)' }}>
               <AlertTriangle size={18} />
             </div>
           </div>
-          <div style={{ fontSize: '1.85rem', fontWeight: 800, color: 'var(--warning)' }}>{low_stock_count}</div>
+          <div className="kpi-metric-val" style={{ fontSize: '1.85rem', fontWeight: 800, color: 'var(--warning)' }}>{low_stock_count}</div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
             Current stock &le; configured minimum
           </div>
         </div>
 
         {/* Card 5: Out of Stock */}
-        <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        <div id="kpi-card-out-of-stock" className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>OUT OF STOCK</span>
             <div style={{ padding: '0.4rem', borderRadius: '8px', background: 'var(--danger-bg)', color: 'var(--danger)' }}>
               <XCircle size={18} />
             </div>
           </div>
-          <div style={{ fontSize: '1.85rem', fontWeight: 800, color: 'var(--danger)' }}>{out_of_stock_count}</div>
+          <div className="kpi-metric-val" style={{ fontSize: '1.85rem', fontWeight: 800, color: 'var(--danger)' }}>{out_of_stock_count}</div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
             Zero available units &bull; Sales blocked
           </div>

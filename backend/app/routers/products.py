@@ -16,7 +16,9 @@ def list_products(
     user: dict = Depends(get_current_user)
 ):
     """List and filter catalog products."""
-    products = db.get_products(search=search, category=category, sort_by=sort_by, order=order)
+    clean_search = search.strip() if search and search.strip() else None
+    clean_category = category.strip() if category and category.strip() and category.strip().lower() != "all" else None
+    products = db.get_products(search=clean_search, category=clean_category, sort_by=sort_by, order=order)
     return {
         "success": True,
         "count": len(products),

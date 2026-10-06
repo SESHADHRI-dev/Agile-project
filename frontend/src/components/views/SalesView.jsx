@@ -64,10 +64,12 @@ export default function SalesView({ sales = [], products = [], onRefresh }) {
         unit_price: parseFloat(formData.unit_price)
       });
       setMessage(res.message);
-      onRefresh();
+      if (onRefresh) {
+        await onRefresh();
+      }
       setTimeout(() => {
         setModalOpen(false);
-      }, 1400);
+      }, 1200);
     } catch (err) {
       setError(err.message || 'Error processing sales transaction');
     } finally {
@@ -84,7 +86,7 @@ export default function SalesView({ sales = [], products = [], onRefresh }) {
             Record customer orders across Indian clients. Feeds historical time-series data into the demand prediction engine.
           </p>
         </div>
-        <button onClick={handleOpenModal} className="btn btn-primary">
+        <button id="btn-open-record-sale" onClick={handleOpenModal} className="btn btn-primary">
           <Plus size={16} />
           <span>Record Customer Sale</span>
         </button>
@@ -137,7 +139,7 @@ export default function SalesView({ sales = [], products = [], onRefresh }) {
           <div className="modal-content">
             <div className="modal-header">
               <h3 style={{ fontSize: '1.1rem', fontWeight: 800 }}>Record Customer Sale</h3>
-              <button onClick={() => setModalOpen(false)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+              <button id="btn-close-sale-modal" onClick={() => setModalOpen(false)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
                 <X size={20} />
               </button>
             </div>
@@ -161,6 +163,7 @@ export default function SalesView({ sales = [], products = [], onRefresh }) {
                 <div className="form-group">
                   <label className="form-label">Select Product *</label>
                   <select
+                    id="sale-product-select"
                     className="form-select"
                     value={formData.product_id}
                     onChange={(e) => handleProductChange(e.target.value)}
@@ -177,6 +180,7 @@ export default function SalesView({ sales = [], products = [], onRefresh }) {
                 <div className="form-group">
                   <label className="form-label">Customer / Client Name</label>
                   <input
+                    id="sale-customer-name"
                     type="text"
                     className="form-input"
                     value={formData.customer_name}
@@ -189,6 +193,7 @@ export default function SalesView({ sales = [], products = [], onRefresh }) {
                   <div className="form-group">
                     <label className="form-label">Sale Quantity *</label>
                     <input
+                      id="sale-quantity"
                       type="number"
                       min="1"
                       required
@@ -201,6 +206,7 @@ export default function SalesView({ sales = [], products = [], onRefresh }) {
                   <div className="form-group">
                     <label className="form-label">Unit Selling Price (₹) *</label>
                     <input
+                      id="sale-unit-price"
                       type="number"
                       step="0.01"
                       min="0.01"
@@ -249,10 +255,11 @@ export default function SalesView({ sales = [], products = [], onRefresh }) {
               </div>
 
               <div className="modal-footer">
-                <button type="button" onClick={() => setModalOpen(false)} className="btn btn-secondary">
+                <button id="btn-cancel-sale" type="button" onClick={() => setModalOpen(false)} className="btn btn-secondary">
                   Cancel
                 </button>
                 <button
+                  id="btn-submit-sale"
                   type="submit"
                   disabled={loading || isOverSale}
                   className="btn btn-primary"

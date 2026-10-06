@@ -123,16 +123,20 @@ class DemandForecaster:
                 daily_series.append(daily_map.get(d, 0.0))
 
         # Step 2: Forecast Daily Demand Rate
-        method_normalized = method.lower().strip()
-        if method_normalized == "moving_average":
+        method_str = (method or "exponential_smoothing").strip()
+        method_lower = method_str.lower()
+        if method_lower in ["moving_average", "sma", "simple_moving_average"]:
             daily_rate = cls.simple_moving_average(daily_series, window=window)
             algorithm_name = f"Simple Moving Average (Window={min(window, len(daily_series))} days)"
-        elif method_normalized == "weighted_moving_average":
+            method_normalized = method_str if method_str.upper() in ["SMA", "SIMPLE_MOVING_AVERAGE"] else "moving_average"
+        elif method_lower in ["weighted_moving_average", "wma"]:
             daily_rate = cls.weighted_moving_average(daily_series, window=window)
             algorithm_name = f"Weighted Moving Average (Window={min(window, len(daily_series))} days)"
+            method_normalized = method_str if method_str.upper() in ["WMA", "WEIGHTED_MOVING_AVERAGE"] else "weighted_moving_average"
         else:
             daily_rate = cls.exponential_smoothing(daily_series, alpha=alpha)
             algorithm_name = f"Single Exponential Smoothing (Alpha={alpha})"
+            method_normalized = method_str if method_str.upper() in ["SES", "EXPONENTIAL_SMOOTHING"] else "exponential_smoothing"
 
         # Projected demand over the forecast horizon
         projected_demand = math.ceil(daily_rate * forecast_horizon_days)

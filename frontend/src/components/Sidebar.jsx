@@ -100,6 +100,8 @@ export default function Sidebar({ activeTab, setActiveTab, alertCount = 0, user,
             return (
               <li key={item.id} style={{ marginBottom: '0.25rem' }}>
                 <button
+                  id={`nav-tab-${item.id}`}
+                  data-tab={item.id}
                   onClick={() => {
                     setActiveTab(item.id);
                     if (onClose) onClose();

@@ -1,4 +1,8 @@
-# Python
+# ==============================================================================
+# IntelliStock India - Git Ignore Rules
+# ==============================================================================
+
+# Python Virtual Environments, Bytecode & Caches
 __pycache__/
 *.py[cod]
 *$py.class
@@ -6,36 +10,91 @@ __pycache__/
 .Python
 env/
 venv/
+.venv/
 ENV/
+env.bak/
+venv.bak/
 .pytest_cache/
 .coverage
 htmlcov/
+tests/__pycache__/
+backend/app/__pycache__/
+backend/app/routers/__pycache__/
+ml/__pycache__/
 
-# Node / React
+# Node / React Dependencies & Build Artifacts
 node_modules/
+*/node_modules/
 dist/
 dist-ssr/
+build/
 *.local
 .vite/
+*.tsbuildinfo
+
+# Local Environment & Secrets (NEVER commit credentials, keys, or tokens)
+.env
+.env.*
+*.env
+!.env.example
+*.pem
+*.key
+credentials.json
+aws_credentials.txt
+*aws*credentials*
+*jwt*secret*
+
+# Local SQLite Databases & Data Files
+backend/data/
+backend/data/*.db
+backend/data/inventory_local.db
+backend/data/reports/
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# Local Logs
+*.log
+logs/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Environment & Credentials (NEVER commit secrets)
-.env
-.env.*.local
-*.pem
-credentials.json
-aws_credentials.txt
+# Browser Recordings, Screenshots & Scratch Workspaces
+*.webm
+*.webp
+*.mp4
+recordings/
+browser-recordings/
+scratch/
+tests/screenshots/
+tests/screenshots_audit/
 
-# OS / IDE
+# Generated Test Downloads & Execution Reports
+tests/downloads/
+downloads/
+tests/audit_results.json
+tests/e2e_results.json
+
+# Ad-hoc Scratch & Debug Verification Scripts
+scratch_*.js
+test_reproduce.js
+frontend/scratch_check.js
+frontend/test_alerts_browser_cases.js
+frontend/test_alerts_sync_reproduce.js
+frontend/test_all_products.js
+frontend/test_catalog_full_verification.js
+frontend/test_catalog_verify.js
+frontend/test_complete_functionality_audit.js
+frontend/test_ip_connect.js
+frontend/test_reproduce.js
+frontend/test_ui_forecasting_acceptance.js
+
+# OS & Editor Files
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
 *.swp
-
-# Local mock DB storage (keep repository clean)
-backend/data/*.db
-backend/data/reports/*.pdf
-backend/data/reports/*.csv
+*.swo

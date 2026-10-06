@@ -22,6 +22,7 @@ export default function App() {
   const [theme, setTheme] = useState('dark');
   const [loading, setLoading] = useState(true);
   const [authConfig, setAuthConfig] = useState(null);
+  const [replenishTarget, setReplenishTarget] = useState(null);
 
   // Core Data
   const [inventorySummary, setInventorySummary] = useState(null);
@@ -30,6 +31,13 @@ export default function App() {
   const [purchases, setPurchases] = useState([]);
   const [sales, setSales] = useState([]);
   const [alerts, setAlerts] = useState([]);
+
+  // Synchronization & Live Status State
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState(() => {
+    return new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' }) + ' IST';
+  });
+  const [syncToast, setSyncToast] = useState({ type: '', message: '' });
 
   // Apply theme to document
   useEffect(() => {
@@ -45,7 +53,7 @@ export default function App() {
           auth_mode: 'local',
           storage_mode: 'local',
           is_local: true,
-          default_admin: { username: 'admin@inventory.io', role: 'Admin', name: 'Dr. S. Sharma (Administrator)' }
+          default_admin: { username: 'admin@intellistock.in', role: 'Admin', name: 'Dr. S. Sharma (Administrator)' }
         }));
         setAuthConfig(cfg);
 
@@ -79,21 +87,62 @@ export default function App() {
     try {
       const [invRes, prodRes, supRes, purRes, salRes, altRes] = await Promise.all([
         api.getInventory().catch(err => { console.error('Inventory error:', err); return null; }),
-        api.getProducts().catch(err => { console.error('Products error:', err); return { data: [] }; }),
-        api.getSuppliers().catch(err => { console.error('Suppliers error:', err); return { data: [] }; }),
-        api.getPurchases().catch(err => { console.error('Purchases error:', err); return { data: [] }; }),
-        api.getSales().catch(err => { console.error('Sales error:', err); return { data: [] }; }),
-        api.getAlerts().catch(err => { console.error('Alerts error:', err); return { data: [] }; })
+        api.getProducts().catch(err => { console.error('Products error:', err); return null; }),
+        api.getSuppliers().catch(err => { console.error('Suppliers error:', err); return null; }),
+        api.getPurchases().catch(err => { console.error('Purchases error:', err); return null; }),
+        api.getSales().catch(err => { console.error('Sales error:', err); return null; }),
+        api.getAlerts().catch(err => { console.error('Alerts error:', err); return null; })
       ]);
 
       if (invRes) setInventorySummary(invRes);
-      if (prodRes && prodRes.data) setProducts(prodRes.data);
-      if (supRes && supRes.data) setSuppliers(supRes.data);
-      if (purRes && purRes.data) setPurchases(purRes.data);
-      if (salRes && salRes.data) setSales(salRes.data);
-      if (altRes && altRes.data) setAlerts(altRes.data);
+
+      const extractList = (res, field) => {
+        if (!res) return null;
+        if (Array.isArray(res)) return res;
+        if (Array.isArray(res.data)) return res.data;
+        if (field && Array.isArray(res[field])) return res[field];
+        return [];
+      };
+
+      const prodList = extractList(prodRes, 'products');
+      if (prodList !== null) setProducts(prodList);
+
+      const supList = extractList(supRes, 'suppliers');
+      if (supList !== null) setSuppliers(supList);
+
+      const purList = extractList(purRes, 'purchases');
+      if (purList !== null) setPurchases(purList);
+
+      const salList = extractList(salRes, 'sales');
+      if (salList !== null) setSales(salList);
+
+      const altList = extractList(altRes, 'alerts');
+      if (altList !== null) setAlerts(altList);
     } catch (err) {
-      console.error('Error syncing app data:', err);
+      console.error('Error refreshing all data:', err);
+    }
+  };
+
+  const handleSync = async () => {
+    if (isSyncing) return;
+    setIsSyncing(true);
+    setSyncToast({ type: '', message: '' });
+    try {
+      await refreshAllData();
+      const istTime = new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' IST';
+      setLastSyncTime(istTime);
+      setSyncToast({
+        type: 'success',
+        message: `Local SQLite & In-Memory State Synchronized at ${istTime}`
+      });
+      setTimeout(() => setSyncToast({ type: '', message: '' }), 4000);
+    } catch (err) {
+      setSyncToast({
+        type: 'error',
+        message: 'Backend server is unreachable. Failed to synchronize application data.'
+      });
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -102,6 +151,20 @@ export default function App() {
       refreshAllData();
     }
   }, [user]);
+
+  // Re-sync authoritative stock balances and active alerts whenever switching to key operational tabs
+  useEffect(() => {
+    if (user && (activeTab === 'alerts' || activeTab === 'dashboard' || activeTab === 'inventory' || activeTab === 'purchases' || activeTab === 'products')) {
+      refreshAllData();
+    }
+  }, [activeTab]);
+
+  const handleNavigate = (tab, params = null) => {
+    if (params) {
+      setReplenishTarget(params);
+    }
+    setActiveTab(tab);
+  };
 
   const toggleTheme = () => {
     setTheme(prev => prev === 'dark' ? 'light' : 'dark');
@@ -178,12 +241,40 @@ export default function App() {
           alertCount={alerts.length}
           theme={theme}
           toggleTheme={toggleTheme}
-          onRefresh={refreshAllData}
+          onRefresh={handleSync}
           onLogout={handleLogout}
           authConfig={authConfig}
           user={user}
           onToggleMobileMenu={() => setMobileMenuOpen(prev => !prev)}
+          isSyncing={isSyncing}
+          lastSyncTime={lastSyncTime}
         />
+
+        {syncToast.message && (
+          <div style={{
+            margin: '0.75rem 1.5rem 0',
+            padding: '0.6rem 1rem',
+            borderRadius: 'var(--radius-md)',
+            background: syncToast.type === 'success' ? 'var(--success-bg)' : 'var(--danger-bg)',
+            border: `1px solid ${syncToast.type === 'success' ? 'rgba(16, 185, 129, 0.4)' : 'rgba(239, 68, 68, 0.4)'}`,
+            color: syncToast.type === 'success' ? 'var(--success)' : 'var(--danger)',
+            fontSize: '0.8rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            boxShadow: 'var(--shadow-sm)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span>{syncToast.message}</span>
+            </div>
+            <button
+              onClick={() => setSyncToast({ type: '', message: '' })}
+              style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0 }}
+            >
+              &times;
+            </button>
+          </div>
+        )}
 
         <main className="content-body">
           {activeTab === 'dashboard' && (
@@ -192,7 +283,7 @@ export default function App() {
               recentSales={sales}
               recentPurchases={purchases}
               alerts={alerts}
-              onNavigate={setActiveTab}
+              onNavigate={handleNavigate}
             />
           )}
 
@@ -219,6 +310,9 @@ export default function App() {
               products={products}
               suppliers={suppliers}
               onRefresh={refreshAllData}
+              user={user}
+              replenishTarget={replenishTarget}
+              onClearReplenishTarget={() => setReplenishTarget(null)}
             />
           )}
 
@@ -234,26 +328,29 @@ export default function App() {
             <InventoryView
               products={products}
               inventorySummary={inventorySummary}
+              onRefresh={refreshAllData}
             />
           )}
 
           {activeTab === 'alerts' && (
             <AlertsView
               alerts={alerts}
-              onNavigate={setActiveTab}
+              onNavigate={handleNavigate}
+              onRefresh={refreshAllData}
+              isSyncing={isSyncing}
             />
           )}
 
           {activeTab === 'prediction' && (
             <PredictionView
               products={products}
-              onNavigate={setActiveTab}
+              onNavigate={handleNavigate}
             />
           )}
 
           {activeTab === 'recommendations' && (
             <RecommendationsView
-              onNavigate={setActiveTab}
+              onNavigate={handleNavigate}
             />
           )}
 

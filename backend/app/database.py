@@ -273,12 +273,13 @@ class Database:
             WHERE p.is_active = 1
             """
             params = []
-            if search:
-                query += " AND (p.name LIKE ? OR p.id LIKE ?)"
-                params.extend([f"%{search}%", f"%{search}%"])
-            if category and category.lower() != "all":
-                query += " AND p.category = ?"
-                params.append(category)
+            if search and search.strip():
+                clean_term = search.strip()
+                query += " AND (p.name LIKE ? OR p.id LIKE ? OR p.hsn_code LIKE ? OR s.name LIKE ? OR p.category LIKE ?)"
+                params.extend([f"%{clean_term}%", f"%{clean_term}%", f"%{clean_term}%", f"%{clean_term}%", f"%{clean_term}%"])
+            if category and category.strip() and category.strip().lower() != "all":
+                query += " AND LOWER(TRIM(p.category)) = LOWER(TRIM(?))"
+                params.append(category.strip())
 
             # Sanitized sort column
             valid_sorts = {"name": "p.name", "price": "p.price", "quantity": "p.quantity", "created_at": "p.created_at"}
@@ -733,7 +734,7 @@ class Database:
                 "Sri Ganesh Traders (Vellore)",
                 "Priya Enterprises (Katpadi)",
                 "Vellore Tech Solutions",
-                "Arun Kumar & Co.",
+                "Seshadhri & Co.",
                 "Lakshmi Stores (Sathuvachari)",
                 "S.K. Industrial Works (Ranipet)"
             ]

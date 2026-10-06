@@ -1,12 +1,17 @@
-const API_BASE = "http://localhost:8000/api";
+// Determine API Base URL:
+// 1. Explicit environment variable if configured (VITE_API_URL or VITE_API_BASE)
+// 2. Browser environment: use relative '/api' which Vite proxies to backend, avoiding all CORS/IPv6 issues
+// 3. Server-side / fallback: default to http://127.0.0.1:8000/api
+const API_BASE = (typeof import.meta !== 'undefined' && (import.meta.env?.VITE_API_URL || import.meta.env?.VITE_API_BASE))
+  || (typeof window !== 'undefined' ? '/api' : 'http://127.0.0.1:8000/api');
 
 class ApiService {
   constructor() {
     // If no token in localStorage, initialize with local development token so requests never lack Bearer header
-    const saved = localStorage.getItem("token");
+    const saved = typeof localStorage !== 'undefined' ? localStorage.getItem("token") : null;
     if (!saved || saved === "undefined" || saved === "null") {
       this.token = "dev-admin-token";
-      localStorage.setItem("token", "dev-admin-token");
+      if (typeof localStorage !== 'undefined') localStorage.setItem("token", "dev-admin-token");
     } else {
       this.token = saved;
     }
@@ -14,25 +19,33 @@ class ApiService {
 
   setToken(token) {
     this.token = token;
-    if (token) {
-      localStorage.setItem("token", token);
-    } else {
-      // In local mode, keep a valid dev fallback
-      this.token = "dev-admin-token";
-      localStorage.setItem("token", "dev-admin-token");
+    if (typeof localStorage !== 'undefined') {
+      if (token) {
+        localStorage.setItem("token", token);
+      } else {
+        // In local mode, keep a valid dev fallback
+        this.token = "dev-admin-token";
+        localStorage.setItem("token", "dev-admin-token");
+      }
     }
+  }
+
+  getHeaders() {
+    return {
+      "Content-Type": "application/json",
+      ...(this.token ? { Authorization: `Bearer ${this.token}` } : { Authorization: "Bearer dev-admin-token" })
+    };
   }
 
   async request(endpoint, options = {}, isRetry = false) {
     const url = `${API_BASE}${endpoint}`;
     const headers = {
-      "Content-Type": "application/json",
-      ...(this.token ? { Authorization: `Bearer ${this.token}` } : { Authorization: "Bearer dev-admin-token" }),
+      ...this.getHeaders(),
       ...(options.headers || {})
     };
 
     try {
-      const response = await fetch(url, { ...options, headers });
+      const response = await fetch(url, { ...options, headers, cache: 'no-store' });
       
       // Automatic 401 Self-Healing for Local Development
       if (response.status === 401 && !isRetry) {
@@ -42,13 +55,31 @@ class ApiService {
         return this.request(endpoint, options, true);
       }
 
-      const data = await response.json();
+      const data = await response.json().catch(() => null);
       if (!response.ok) {
-        throw new Error(data.detail || data.error || `HTTP ${response.status} Error`);
+        let msg = `HTTP ${response.status} Error`;
+        if (data) {
+          if (typeof data.detail === 'string') {
+            msg = data.detail;
+          } else if (Array.isArray(data.detail)) {
+            msg = data.detail
+              .map(d => (d.msg ? `${d.loc ? d.loc.slice(-1)[0] + ': ' : ''}${d.msg}` : JSON.stringify(d)))
+              .join('; ');
+          } else if (data.error) {
+            msg = typeof data.error === 'string' ? data.error : JSON.stringify(data.error);
+          }
+        }
+        throw new Error(msg);
       }
       return data;
     } catch (err) {
       console.error(`API Error [${endpoint}]:`, err);
+      // Transform raw network "Failed to fetch" into actionable user diagnostics
+      if (err.name === 'TypeError' && err.message.toLowerCase().includes('fetch')) {
+        throw new Error(
+          `Unable to connect to backend server at ${url}. Please ensure the backend server is running on http://127.0.0.1:8000.`
+        );
+      }
       throw err;
     }
   }
@@ -178,12 +209,12 @@ class ApiService {
     return this.request("/reports/summary");
   }
 
-  getExportUrl(reportType) {
-    return `${API_BASE}/reports/export?report_type=${reportType}&format=csv`;
+  getExportUrl(reportType, format = "csv") {
+    return `${API_BASE}/reports/export?report_type=${reportType}&format=${format}`;
   }
 
-  async downloadReport(reportType) {
-    const res = await fetch(`${API_BASE}/reports/export?report_type=${reportType}&format=csv`, {
+  async downloadReport(reportType, format = "csv") {
+    const res = await fetch(`${API_BASE}/reports/export?report_type=${reportType}&format=${format}`, {
       headers: this.getHeaders()
     });
     if (!res.ok) {

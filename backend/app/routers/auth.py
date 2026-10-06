@@ -28,7 +28,7 @@ def get_auth_config():
         "default_staff": {
             "username": "staff@intellistock.in",
             "role": "Staff",
-            "name": "Arun Kumar (Operations Staff)"
+            "name": "Seshadhri (Operations Staff)"
         }
     }
 

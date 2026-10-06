@@ -87,14 +87,16 @@
     "data": [
       {
         "id": "PRD-1001",
-        "name": "Industrial IoT Sensor Hub",
-        "category": "Electronics",
-        "price": 149.99,
-        "quantity": 18,
-        "min_stock_level": 25,
+        "name": "LED Bulb 9W Cool Day White (B22)",
+        "category": "Electrical Components",
+        "price": 120.00,
+        "quantity": 100,
+        "min_stock_level": 50,
         "supplier_id": "SUP-001",
-        "supplier_name": "Apex Electronics Ltd",
-        "status": "LOW STOCK",
+        "supplier_name": "Sri Lakshmi Industrial Supplies",
+        "hsn_code": "8539",
+        "gst_rate": 18.0,
+        "status": "IN STOCK",
         "is_active": true
       }
     ]
@@ -107,12 +109,14 @@
 - **Request Body:**
   ```json
   {
-    "name": "Thermal Probe Sensor",
-    "category": "Sensors",
-    "price": 49.50,
-    "quantity": 100,
-    "min_stock_level": 20,
-    "supplier_id": "SUP-002"
+    "name": "Modular Electrical Switch 16A (1-Way)",
+    "category": "Electrical Components",
+    "price": 95.00,
+    "quantity": 22,
+    "min_stock_level": 15,
+    "supplier_id": "SUP-001",
+    "hsn_code": "8536",
+    "gst_rate": 18.0
   }
   ```
 - **Response (201 Created):** Created product record.
@@ -132,19 +136,23 @@
 
 ### 3.1 List Suppliers
 - **Endpoint:** `GET /suppliers`
-- **Query Parameters:** `search`, `category`
+- **Query Parameters:** `search`
 
 ### 3.2 Create Supplier
 - **Endpoint:** `POST /suppliers`
+- **Authorization:** `Admin`
 - **Request Body:**
   ```json
   {
-    "name": "Apex Electronics Ltd",
-    "contact_person": "Robert Vance",
-    "phone": "+1-555-0192",
-    "email": "robert@apexelectronics.com",
-    "address": "400 Silicon Parkway, San Jose, CA",
-    "supplied_categories": "Electronics, Sensors"
+    "name": "Sri Lakshmi Industrial Supplies",
+    "contact_person": "K. Sundaram",
+    "phone": "+91 98421 54321",
+    "email": "orders@srilakshmiind.in",
+    "address": "148 GST Road, Guindy Industrial Estate, Chennai, Tamil Nadu - 600032, India",
+    "supplied_categories": "Electrical Components, Industrial Tools",
+    "gstin": "33AABCS1234A1Z1",
+    "state": "Tamil Nadu",
+    "pin_code": "600032"
   }
   ```
 
@@ -232,16 +240,16 @@
   {
     "success": true,
     "product_id": "PRD-1001",
-    "product_name": "Industrial IoT Sensor Hub",
+    "product_name": "LED Bulb 9W Cool Day White (B22)",
     "method_used": "Single Exponential Smoothing (alpha=0.3)",
-    "historical_days_analyzed": 60,
+    "historical_days_analyzed": 45,
     "total_historical_sales": 142,
     "forecast_period_days": 30,
     "predicted_demand": 72,
-    "current_stock": 18,
+    "current_stock": 100,
     "safety_stock": 14,
-    "recommended_restock": 68,
-    "status": "RESTOCK_URGENT"
+    "recommended_restock": 0,
+    "status": "SUFFICIENT_STOCK"
   }
   ```
 
@@ -250,7 +258,7 @@
 ## 8. Reports & Demo Seeding
 
 ### 8.1 Export Report (CSV / PDF)
-- **Endpoint:** `GET /reports/export?type=inventory&format=csv`
+- **Endpoint:** `GET /reports/export?report_type=inventory&format=csv`
 - **Response:** CSV raw content or downloadable S3 pre-signed URL.
 
 ### 8.2 Seed Realistic Demo Data

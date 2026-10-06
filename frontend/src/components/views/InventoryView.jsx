@@ -6,10 +6,15 @@ export default function InventoryView({ products = [], inventorySummary }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
 
+  const cleanSearch = searchTerm.trim().toLowerCase();
+  const cleanStatus = statusFilter.trim().toUpperCase();
+
   const filtered = products.filter((p) => {
-    const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          p.id.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'ALL' || p.status === statusFilter;
+    if (!p) return false;
+    const pName = (p.name || '').toLowerCase();
+    const pId = (p.id || '').toLowerCase();
+    const matchesSearch = !cleanSearch || pName.includes(cleanSearch) || pId.includes(cleanSearch);
+    const matchesStatus = cleanStatus === 'ALL' || (p.status || '').toUpperCase() === cleanStatus;
     return matchesSearch && matchesStatus;
   });
 

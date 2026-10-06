@@ -40,11 +40,11 @@ class InventoryLogic:
     def evaluate_stock_status(current_stock: int, min_stock_level: int) -> str:
         """
         Evaluates product stock status.
-        - OUT OF STOCK: current_stock == 0
+        - OUT OF STOCK: current_stock <= 0
         - LOW STOCK: current_stock <= min_stock_level
         - IN STOCK: current_stock > min_stock_level
         """
-        if current_stock == 0:
+        if current_stock <= 0:
             return "OUT OF STOCK"
         elif current_stock <= min_stock_level:
             return "LOW STOCK"
