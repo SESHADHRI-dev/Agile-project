@@ -1,9 +1,18 @@
+// Production AWS API Gateway Endpoint
+const PRODUCTION_API_GATEWAY_URL = 'https://0wplj9j2jg.execute-api.us-east-1.amazonaws.com/Prod/api';
+
 // Determine API Base URL:
 // 1. Explicit environment variable if configured (VITE_API_URL or VITE_API_BASE)
-// 2. Browser environment: use relative '/api' which Vite proxies to backend, avoiding all CORS/IPv6 issues
-// 3. Server-side / fallback: default to http://127.0.0.1:8000/api
+// 2. Browser on deployed/cloud domain: ALWAYS use production AWS API Gateway URL
+// 3. Browser on local development (localhost / 127.0.0.1): use '/api' to leverage Vite reverse proxy
+const isLocalHost = typeof window !== 'undefined' && (
+  window.location.hostname === 'localhost' ||
+  window.location.hostname === '127.0.0.1' ||
+  window.location.hostname === '0.0.0.0'
+);
+
 const API_BASE = (typeof import.meta !== 'undefined' && (import.meta.env?.VITE_API_URL || import.meta.env?.VITE_API_BASE))
-  || (typeof window !== 'undefined' ? '/api' : 'http://127.0.0.1:8000/api');
+  || (!isLocalHost ? PRODUCTION_API_GATEWAY_URL : '/api');
 
 class ApiService {
   constructor() {
@@ -76,9 +85,14 @@ class ApiService {
       console.error(`API Error [${endpoint}]:`, err);
       // Transform raw network "Failed to fetch" into actionable user diagnostics
       if (err.name === 'TypeError' && err.message.toLowerCase().includes('fetch')) {
-        throw new Error(
-          `Unable to connect to backend server at ${url}. Please ensure the backend server is running on http://127.0.0.1:8000.`
+        const isLocal = typeof window !== 'undefined' && (
+          window.location.hostname === 'localhost' ||
+          window.location.hostname === '127.0.0.1'
         );
+        const guidance = isLocal
+          ? `Local backend server is not responding at ${url}. Please ensure the backend server is running on http://127.0.0.1:8000 (execute: python -m uvicorn backend.app.main:app --port 8000 --reload).`
+          : `Unable to connect to production AWS backend at ${url}. Please check your internet connectivity or AWS API Gateway status.`;
+        throw new Error(guidance);
       }
       throw err;
     }
